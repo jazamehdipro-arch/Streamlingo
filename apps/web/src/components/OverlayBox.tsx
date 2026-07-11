@@ -22,7 +22,7 @@ export default function OverlayBox({
         position === "top-left" ? "left-4 top-4" : "right-4 top-4"
       }`}
     >
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">Keywords</p>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">Mots-clés</p>
       <ul className="flex flex-col gap-1">
         {visible.map((cue, i) => {
           const isExpanded = expanded === i;

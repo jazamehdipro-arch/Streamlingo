@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getServiceSupabase } from "./supabase";
+import { hashToken } from "./extensionTokens";
 import { SESSION_COOKIE_NAME } from "./authCookieName";
 
 /**
@@ -39,9 +40,19 @@ async function resolveExtensionToken(token: string): Promise<string | null> {
   const { data } = await supabase
     .from("extension_tokens")
     .select("user_id")
-    .eq("access_token", token)
+    .eq("token_hash", hashToken(token))
+    .gt("expires_at", new Date().toISOString())
     .maybeSingle();
-  return (data?.user_id as string | undefined) ?? null;
+  if (!data) return null;
+
+  // Fire-and-forget usage timestamp — auth must not block on it.
+  void supabase
+    .from("extension_tokens")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("token_hash", hashToken(token))
+    .then(() => undefined);
+
+  return (data.user_id as string | undefined) ?? null;
 }
 
 async function resolveSupabaseAccessToken(token: string): Promise<string | null> {

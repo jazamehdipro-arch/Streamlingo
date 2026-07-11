@@ -55,6 +55,7 @@ async function postSegment(currentSession: VideoSession, index: number): Promise
       startSeconds: local.startSeconds,
       endSeconds: local.endSeconds,
       transcript: local.transcript,
+      cues: local.cues,
     });
     currentSession.postedByIndex.set(index, { local, backend: segment, keywordCues });
   } catch {

@@ -25,6 +25,19 @@ export interface ContentSource {
   createdAt: string;
 }
 
+/**
+ * One caption cue with its real timestamp, as extracted from the source
+ * (YouTube timedtext track, or a future STT provider). Clients send these
+ * alongside the segment transcript so the backend can anchor each keyword
+ * to the cue it actually occurs in, instead of guessing by linear
+ * interpolation over the whole segment (docs/RISKS.md §2).
+ */
+export interface TranscriptCue {
+  text: string;
+  startSeconds: number;
+  durSeconds: number;
+}
+
 /** A time-bounded chunk of a source, used for quizzes / cloze / segment boundaries. */
 export interface Segment {
   id: string;

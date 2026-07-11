@@ -23,11 +23,11 @@ export default function VocabReviewPage() {
   useEffect(() => {
     fetch("/api/vocab?due=true")
       .then(async (res) => {
-        if (!res.ok) throw new Error(`Failed to load review queue (${res.status})`);
+        if (!res.ok) throw new Error(`Impossible de charger la file de révision (${res.status})`);
         return res.json();
       })
       .then((body: { items: VocabWithSrs[] }) => setQueue(body.items))
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load review queue"));
+      .catch((err) => setError(err instanceof Error ? err.message : "Impossible de charger la file de révision"));
   }, []);
 
   const current = queue?.[position] ?? null;
@@ -44,7 +44,7 @@ export default function VocabReviewPage() {
       setRevealed(false);
       setPosition((p) => p + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save review");
+      setError(err instanceof Error ? err.message : "Impossible d’enregistrer la révision");
     } finally {
       setSubmitting(false);
     }
@@ -54,16 +54,16 @@ export default function VocabReviewPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 py-10 text-center">
       <div className="w-full">
         <Link href="/vocab" className="text-sm text-neutral-400 hover:text-neutral-700">
-          ← Vocab bank
+          ← Banque de vocabulaire
         </Link>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {queue === null && !error && <p className="text-sm text-neutral-500">Loading…</p>}
+      {queue === null && !error && <p className="text-sm text-neutral-500">Chargement…</p>}
 
       {queue && queue.length === 0 && (
-        <p className="text-sm text-neutral-500">Nothing due for review right now — nice work.</p>
+        <p className="text-sm text-neutral-500">Rien à réviser pour le moment — beau travail.</p>
       )}
 
       {queue && current && (
@@ -85,7 +85,7 @@ export default function VocabReviewPage() {
                 <p className="text-xs text-neutral-400">{current.exampleTranslation}</p>
               </div>
             )}
-            {!revealed && <p className="text-xs text-neutral-400">Tap to reveal</p>}
+            {!revealed && <p className="text-xs text-neutral-400">Touche pour révéler</p>}
           </div>
 
           {revealed && (
@@ -107,7 +107,7 @@ export default function VocabReviewPage() {
       )}
 
       {queue && !current && queue.length > 0 && (
-        <p className="text-sm text-neutral-500">Review complete for now.</p>
+        <p className="text-sm text-neutral-500">Révision terminée pour aujourd’hui.</p>
       )}
     </main>
   );

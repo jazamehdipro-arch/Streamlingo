@@ -35,8 +35,12 @@ Body: `{ kind: "youtube" | "podcast", externalId?: string, title: string, durati
 → `ContentSource`. Idempotent on `(userId, kind, externalId)` for YouTube sources.
 
 ### `POST /api/sources/:sourceId/segments`
-Body: `{ index: number, startSeconds: number, endSeconds: number, transcript: string }`
+Body: `{ index: number, startSeconds: number, endSeconds: number, transcript: string, cues?: TranscriptCue[] }`
 → `{ segment: Segment, keywordCues: KeywordCue[] }`.
+`cues` are the original caption cues with real timestamps when the client has
+them (the extension always does). With cues, keyword timing is anchored to the
+cue containing the word (~2-5s worst-case error); without, it falls back to
+linear interpolation across the whole segment (docs/RISKS.md §2).
 Calls the LLM once to extract+translate keywords from the transcript, already
 filtered to the caller's level (`filterKeywordsForLevel` from `@streamlingo/shared`),
 persists the segment + cues, and upserts each lemma into the caller's `vocab_items`

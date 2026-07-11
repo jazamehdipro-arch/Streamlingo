@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { filterKeywordsForLevel } from "@streamlingo/shared";
+import { filterKeywordsForLevel, type KeywordCue } from "@streamlingo/shared";
 import { getUserId } from "@/lib/auth";
 import { getServiceSupabase } from "@/lib/supabase";
 import { badRequest, notFound, serverError, unauthorized } from "@/lib/http";
@@ -16,6 +16,18 @@ const bodySchema = z.object({
   startSeconds: z.number().min(0),
   endSeconds: z.number().min(0),
   transcript: z.string().min(1),
+  // Original caption cues with real timestamps, when the client has them
+  // (extension always does; web app podcast flow usually doesn't). Lets
+  // wordTiming anchor keywords to real cue times instead of interpolating.
+  cues: z
+    .array(
+      z.object({
+        text: z.string(),
+        startSeconds: z.number().min(0),
+        durSeconds: z.number().min(0),
+      })
+    )
+    .optional(),
 });
 
 export async function POST(
@@ -43,7 +55,7 @@ export async function POST(
   const profile = await fetchProfile(supabase, userId);
   if (!profile) return badRequest("Complete onboarding before analyzing segments");
 
-  const { index, startSeconds, endSeconds, transcript } = parsed.data;
+  const { index, startSeconds, endSeconds, transcript, cues } = parsed.data;
 
   const { data: segmentRow, error: segmentError } = await supabase
     .from("segments")
@@ -68,7 +80,7 @@ export async function POST(
     profile.targetLanguage,
     profile.nativeLanguage
   );
-  const timedCues = estimateWordTimings(transcript, startSeconds, endSeconds, rawKeywords);
+  const timedCues = estimateWordTimings(transcript, startSeconds, endSeconds, rawKeywords, cues);
   const filteredCues = filterKeywordsForLevel(timedCues, profile.level);
 
   await supabase.from("keyword_cues").delete().eq("segment_id", segmentRow.id);
@@ -89,9 +101,18 @@ export async function POST(
     );
     if (cuesError) return serverError(cuesError.message);
 
+    // One encounter per lemma per segment — a word repeated within the same
+    // segment isn't a new "encounter", and recording it twice would also
+    // trip recordVocabEncounter's non-atomic read-then-insert against itself.
+    const byLemma = new Map<string, KeywordCue[]>();
     for (const cue of filteredCues) {
-      const { previouslyEncountered } = await recordVocabEncounter(supabase, userId, sourceId, cue);
-      cue.previouslyEncountered = previouslyEncountered;
+      const group = byLemma.get(cue.lemma);
+      if (group) group.push(cue);
+      else byLemma.set(cue.lemma, [cue]);
+    }
+    for (const [, group] of byLemma) {
+      const { previouslyEncountered } = await recordVocabEncounter(supabase, userId, sourceId, group[0]);
+      for (const cue of group) cue.previouslyEncountered = previouslyEncountered;
     }
   }
 

@@ -57,7 +57,13 @@ export function createSource(input: {
 
 export function postSegment(
   sourceId: string,
-  input: { index: number; startSeconds: number; endSeconds: number; transcript: string }
+  input: {
+    index: number;
+    startSeconds: number;
+    endSeconds: number;
+    transcript: string;
+    cues: { text: string; startSeconds: number; durSeconds: number }[];
+  }
 ): Promise<{ segment: Segment; keywordCues: KeywordCue[] }> {
   return request<{ segment: Segment; keywordCues: KeywordCue[] }>(
     "POST",

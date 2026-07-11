@@ -18,7 +18,7 @@ export default function HomePage() {
         if (cancelled) return;
         router.replace(data.session ? "/learn" : "/login");
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Configuration error");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Erreur de configuration");
       }
     }
 

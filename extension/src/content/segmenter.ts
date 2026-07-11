@@ -9,6 +9,9 @@ export interface LocalSegment {
   startSeconds: number;
   endSeconds: number;
   transcript: string;
+  /** Original cues with real timestamps, forwarded to the backend so keyword
+   * timing can be anchored to actual caption times (docs/RISKS.md §2). */
+  cues: CaptionCue[];
 }
 
 /**
@@ -35,6 +38,7 @@ export function sliceIntoSegments(cues: CaptionCue[]): LocalSegment[] {
       startSeconds: bucketStart,
       endSeconds: last.startSeconds + last.durSeconds,
       transcript: bucket.map((c) => c.text).join(" "),
+      cues: bucket,
     });
     bucket = [];
   };
@@ -69,6 +73,7 @@ export function sliceIntoSegments(cues: CaptionCue[]): LocalSegment[] {
     if (lastSeg && prevSeg && lastSeg.endSeconds - lastSeg.startSeconds < MIN_SEGMENT_SECONDS) {
       prevSeg.endSeconds = lastSeg.endSeconds;
       prevSeg.transcript = `${prevSeg.transcript} ${lastSeg.transcript}`;
+      prevSeg.cues = [...prevSeg.cues, ...lastSeg.cues];
       segments.pop();
     }
   }

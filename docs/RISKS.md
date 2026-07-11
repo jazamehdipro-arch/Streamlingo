@@ -32,11 +32,17 @@ prononcé" demande soit :
   ce scaffold en MVP : `estimateWordTimings` répartit linéairement le temps d'une
   cue entre ses mots — imprécis mais raisonnable pour un débit de parole régulier).
 
-**Ce que fait ce scaffold** : le contrat `KeywordCue.startSeconds` est déjà présent
-dans le schéma et le type partagé, avec une implémentation approximative
-(interpolation linéaire dans la cue). C'est le premier point à remplacer par un
-vrai alignement mot-à-mot avant un lancement public — sinon l'overlay "bluffant"
-promis par la spec risque d'être "en retard/en avance" et frustrant.
+**Ce que fait ce scaffold** : deux niveaux de précision, le meilleur disponible gagne
+(`apps/web/src/lib/wordTiming.ts`) :
+1. **Ancrage par cue** (extension, toujours) : le client envoie les cues d'origine
+   avec leurs vrais timestamps (`cues` dans `POST /api/sources/:id/segments`), et
+   chaque mot-clé est daté par la cue qui le contient + un offset linéaire dans la
+   cue. Erreur max ≈ une cue (2-5 s).
+2. **Interpolation linéaire sur le segment** (repli, web app sans audio aligné) :
+   erreur max ≈ un segment (30-60 s), acceptable seulement comme indication grossière.
+
+Le vrai alignement mot-à-mot (forced aligner / Whisper word timestamps) reste le
+dernier étage à construire pour un overlay réellement "bluffant" au mot près.
 
 ## Recommandation
 

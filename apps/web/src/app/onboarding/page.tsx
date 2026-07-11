@@ -33,11 +33,11 @@ export default function OnboardingPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Request failed (${res.status})`);
+        throw new Error(body.error ?? `Échec de la requête (${res.status})`);
       }
       router.push("/learn");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -46,9 +46,9 @@ export default function OnboardingPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6">
       <div>
-        <h1 className="text-xl font-semibold">Set up your learning profile</h1>
+        <h1 className="text-xl font-semibold">Configure ton profil d’apprentissage</h1>
         <p className="text-sm text-neutral-500">
-          This drives how many words get translated in the overlay and how hard quizzes are.
+          Ton niveau détermine combien de mots sont traduits dans l’encart et la difficulté des quiz.
         </p>
       </div>
 
@@ -60,7 +60,7 @@ export default function OnboardingPage() {
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          Target language (what you&apos;re learning)
+          Langue cible (celle que tu apprends)
           <select
             value={targetLanguage}
             onChange={(e) => setTargetLanguage(e.target.value)}
@@ -75,7 +75,7 @@ export default function OnboardingPage() {
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          Native language
+          Langue maternelle
           <select
             value={nativeLanguage}
             onChange={(e) => setNativeLanguage(e.target.value)}
@@ -90,7 +90,7 @@ export default function OnboardingPage() {
         </label>
 
         <fieldset className="flex flex-col gap-2 text-sm">
-          <legend className="mb-1">CEFR level</legend>
+          <legend className="mb-1">Niveau CECR</legend>
           <div className="flex gap-2">
             {CEFR_LEVELS.map((l) => (
               <button
@@ -114,7 +114,7 @@ export default function OnboardingPage() {
           disabled={loading}
           className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {loading ? "Saving…" : "Continue"}
+          {loading ? "Enregistrement…" : "Continuer"}
         </button>
       </form>
     </main>

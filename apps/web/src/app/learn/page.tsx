@@ -59,7 +59,7 @@ export default function LearnPage() {
         }
         setProfile(data);
       })
-      .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load profile"));
+      .catch((err) => setLoadError(err instanceof Error ? err.message : "Impossible de charger le profil"));
   }, [router]);
 
   const audioSrc = source ? audioUrl.trim() : "";
@@ -110,7 +110,7 @@ export default function LearnPage() {
         )
       );
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Segment analysis failed");
+      setLoadError(err instanceof Error ? err.message : "Échec de l’analyse du passage");
       setSegments((prev) => prev.map((s, i) => (i === index ? { ...s, analyzing: false } : s)));
     }
   }
@@ -137,7 +137,7 @@ export default function LearnPage() {
       const text = await res.text();
       setTranscriptInput(text);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Could not fetch transcript URL");
+      setFormError(err instanceof Error ? err.message : "Impossible de récupérer la transcription depuis l’URL");
     } finally {
       setFetchingTranscript(false);
     }
@@ -149,7 +149,7 @@ export default function LearnPage() {
 
     const transcript = transcriptInput.trim();
     if (!transcript) {
-      setFormError("Paste a transcript first.");
+      setFormError("Colle d’abord une transcription.");
       return;
     }
 
@@ -158,7 +158,7 @@ export default function LearnPage() {
       const res = await fetch("/api/sources", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "podcast", title: title || "Untitled podcast" }),
+        body: JSON.stringify({ kind: "podcast", title: title || "Podcast sans titre" }),
       });
       if (!res.ok) throw new Error(`Could not create source (${res.status})`);
       const createdSource: ContentSource = await res.json();
@@ -178,7 +178,7 @@ export default function LearnPage() {
       setElapsed(0);
       setPlaying(false);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Something went wrong");
+      setFormError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setStarting(false);
     }
@@ -194,7 +194,7 @@ export default function LearnPage() {
       const body: { questions: QuizQuestion[] } = await res.json();
       setActiveQuiz({ segmentIndex: index, questions: body.questions });
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Could not load quiz");
+      setLoadError(err instanceof Error ? err.message : "Impossible de charger le quiz");
     } finally {
       setQuizLoading(false);
     }
@@ -221,7 +221,7 @@ export default function LearnPage() {
       setClozeBySegment((prev) => ({ ...prev, [index]: body }));
       setClozeVisible(index);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Could not load cloze exercise");
+      setLoadError(err instanceof Error ? err.message : "Impossible de charger l’exercice à trous");
     } finally {
       setClozeLoading(false);
     }
@@ -237,7 +237,7 @@ export default function LearnPage() {
       const body: { transcript: string; translation: string } = await res.json();
       setReplay(body);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Could not load replay");
+      setLoadError(err instanceof Error ? err.message : "Impossible de charger la réécoute");
     } finally {
       setReplayLoading(false);
     }
@@ -254,7 +254,7 @@ export default function LearnPage() {
   if (profile === undefined) {
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-neutral-500">Loading…</p>
+        <p className="text-sm text-neutral-500">Chargement…</p>
       </main>
     );
   }
@@ -270,9 +270,9 @@ export default function LearnPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6 py-12">
         <div>
-          <h1 className="text-xl font-semibold">New podcast session</h1>
+          <h1 className="text-xl font-semibold">Nouvelle session podcast</h1>
           <p className="text-sm text-neutral-500">
-            Paste a transcript (or link to one) and, optionally, an audio URL.
+            Colle une transcription (ou un lien vers celle-ci) et, si tu l’as, l’URL de l’audio.
           </p>
         </div>
 
@@ -284,17 +284,17 @@ export default function LearnPage() {
 
         <form onSubmit={startSession} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            Title
+            Titre
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Episode title"
+              placeholder="Titre de l’épisode"
               className="rounded-md border border-neutral-300 px-3 py-2"
             />
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            Audio URL (optional — enables real playback)
+            URL audio (optionnel — active la vraie lecture)
             <input
               value={audioUrl}
               onChange={(e) => setAudioUrl(e.target.value)}
@@ -304,7 +304,7 @@ export default function LearnPage() {
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            Transcript URL (optional)
+            URL de la transcription (optionnel)
             <div className="flex gap-2">
               <input
                 value={transcriptUrl}
@@ -318,18 +318,18 @@ export default function LearnPage() {
                 disabled={!transcriptUrl || fetchingTranscript}
                 className="rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:opacity-50"
               >
-                {fetchingTranscript ? "…" : "Fetch"}
+                {fetchingTranscript ? "…" : "Récupérer"}
               </button>
             </div>
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            Transcript
+            Transcription
             <textarea
               value={transcriptInput}
               onChange={(e) => setTranscriptInput(e.target.value)}
               rows={10}
-              placeholder="Paste the full transcript here…"
+              placeholder="Colle la transcription complète ici…"
               className="rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs"
             />
           </label>
@@ -339,7 +339,7 @@ export default function LearnPage() {
             disabled={starting}
             className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {starting ? "Starting…" : "Start session"}
+            {starting ? "Démarrage…" : "Démarrer la session"}
           </button>
         </form>
       </main>
@@ -378,21 +378,21 @@ export default function LearnPage() {
             onClick={() => setPlaying((p) => !p)}
             className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
           >
-            {playing ? "Pause" : "Play"}
+            {playing ? "Pause" : "Lecture"}
           </button>
           <p className="text-xs text-neutral-400">
-            No audio URL given — simulating playback with elapsed time.
+            Pas d’URL audio — lecture simulée par le temps écoulé.
           </p>
         </div>
       )}
 
       <section className="rounded-lg border border-neutral-200 p-4">
-        <p className="mb-2 text-xs uppercase tracking-wide text-neutral-400">Current passage</p>
+        <p className="mb-2 text-xs uppercase tracking-wide text-neutral-400">Passage en cours</p>
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">
           {currentSegment?.text}
         </p>
         {currentSegment?.analyzing && (
-          <p className="mt-2 text-xs text-neutral-400">Analyzing keywords…</p>
+          <p className="mt-2 text-xs text-neutral-400">Analyse des mots-clés…</p>
         )}
       </section>
 

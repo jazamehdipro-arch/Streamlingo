@@ -30,7 +30,7 @@ export default function LoginPage() {
       syncSessionCookie(data.session);
       router.push("/onboarding");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,7 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div>
         <h1 className="text-xl font-semibold">StreamLingo</h1>
-        <p className="text-sm text-neutral-500">Sign in to continue.</p>
+        <p className="text-sm text-neutral-500">Connecte-toi pour continuer.</p>
       </div>
 
       <div className="flex gap-2 rounded-lg bg-neutral-100 p-1 text-sm">
@@ -53,7 +53,7 @@ export default function LoginPage() {
               mode === m ? "bg-white font-medium shadow-sm" : "text-neutral-500"
             }`}
           >
-            {m === "login" ? "Log in" : "Sign up"}
+            {m === "login" ? "Connexion" : "Inscription"}
           </button>
         ))}
       </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Password
+          Mot de passe
           <input
             type="password"
             required
@@ -91,7 +91,7 @@ export default function LoginPage() {
           disabled={loading}
           className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {loading ? "…" : mode === "login" ? "Log in" : "Create account"}
+          {loading ? "…" : mode === "login" ? "Se connecter" : "Créer un compte"}
         </button>
       </form>
     </main>

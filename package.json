@@ -11,6 +11,7 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "build:web": "npm run build --workspace=apps/web",
     "build:shared": "npm run build --workspace=packages/shared",
-    "build:extension": "npm run build --workspace=extension"
+    "build:extension": "npm run build --workspace=extension",
+    "test": "node scripts/logic-tests.mjs"
   }
 }

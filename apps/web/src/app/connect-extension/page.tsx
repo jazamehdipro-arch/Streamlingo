@@ -21,7 +21,7 @@ export default function ConnectExtensionPage() {
       setCode(body.code);
       setExpiresAt(body.expiresAt);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -30,9 +30,9 @@ export default function ConnectExtensionPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6 text-center">
       <div>
-        <h1 className="text-xl font-semibold">Connect the browser extension</h1>
+        <h1 className="text-xl font-semibold">Associer l’extension navigateur</h1>
         <p className="text-sm text-neutral-500">
-          Generate a code below, then paste it into the extension&apos;s options page.
+          Génère un code ci-dessous, puis colle-le dans la page d’options de l’extension.
         </p>
       </div>
 
@@ -47,7 +47,7 @@ export default function ConnectExtensionPage() {
           <p className="font-mono text-3xl font-semibold tracking-widest">{code}</p>
           {expiresAt && (
             <p className="text-xs text-neutral-400">
-              Expires at {new Date(expiresAt).toLocaleTimeString()}
+              Expire à {new Date(expiresAt).toLocaleTimeString("fr-FR")}
             </p>
           )}
           <button
@@ -56,7 +56,7 @@ export default function ConnectExtensionPage() {
             disabled={loading}
             className="mt-2 text-sm text-neutral-500 underline disabled:opacity-50"
           >
-            Generate a new code
+            Générer un nouveau code
           </button>
         </div>
       ) : (
@@ -66,7 +66,7 @@ export default function ConnectExtensionPage() {
           disabled={loading}
           className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {loading ? "Generating…" : "Generate pairing code"}
+          {loading ? "Génération…" : "Générer un code d’association"}
         </button>
       )}
     </main>

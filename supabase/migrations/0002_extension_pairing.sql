@@ -12,13 +12,15 @@ create table extension_pairing_codes (
 create index extension_pairing_codes_user_idx on extension_pairing_codes(user_id);
 
 -- Bearer tokens the extension stores in chrome.storage.local and sends as
--- `Authorization: Bearer <token>` on every request; apps/web/src/lib/auth.ts
--- checks this table first before falling back to treating the header as a
--- Supabase access token (so the same header path works for both clients).
+-- `Authorization: Bearer <token>` on every request. Only a SHA-256 hash is
+-- stored: a leaked database dump must not yield usable credentials. The
+-- plaintext token exists exactly once, in the pair-exchange response.
 create table extension_tokens (
-  access_token text primary key,
+  token_hash text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  last_used_at timestamptz
 );
 create index extension_tokens_user_idx on extension_tokens(user_id);
 
@@ -27,5 +29,5 @@ alter table extension_tokens enable row level security;
 
 -- Both tables are only ever read/written via the service-role key in API
 -- routes (pairing codes are minted/consumed server-side; tokens are minted
--- and checked server-side) — RLS enabled with zero policies denies all
+-- and checked server-side) -- RLS enabled with zero policies denies all
 -- anon/authenticated access by default, which is what we want here.

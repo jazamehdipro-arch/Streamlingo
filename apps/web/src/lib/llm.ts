@@ -35,12 +35,16 @@ const extractKeywordsResponseSchema = z.object({
   keywords: z.array(keywordSchema),
 });
 
-const quizQuestionSchema = z.object({
-  question: z.string().min(1),
-  choices: z.array(z.string().min(1)).min(2).max(6),
-  correctIndex: z.number().int().min(0),
-  explanation: z.string().min(1),
-});
+const quizQuestionSchema = z
+  .object({
+    question: z.string().min(1),
+    choices: z.array(z.string().min(1)).min(2).max(6),
+    correctIndex: z.number().int().min(0),
+    explanation: z.string().min(1),
+  })
+  .refine((q) => q.correctIndex < q.choices.length, {
+    message: "correctIndex out of range for choices",
+  });
 
 const generateQuizResponseSchema = z.object({
   questions: z.array(quizQuestionSchema).min(2).max(3),
@@ -51,10 +55,15 @@ const clozeAnswerSchema = z.object({
   word: z.string().min(1),
 });
 
-const generateClozeResponseSchema = z.object({
-  transcriptWithBlanks: z.string().min(1),
-  answers: z.array(clozeAnswerSchema).min(1),
-});
+const generateClozeResponseSchema = z
+  .object({
+    transcriptWithBlanks: z.string().min(1),
+    answers: z.array(clozeAnswerSchema).min(1),
+  })
+  .refine(
+    (c) => (c.transcriptWithBlanks.match(/___/g) ?? []).length === c.answers.length,
+    { message: "blank count does not match answers length" }
+  );
 
 const replayResponseSchema = z.object({
   transcript: z.string().min(1),
@@ -67,10 +76,22 @@ const replayResponseSchema = z.object({
  * caller (rather than a generic "LLM client" abstraction) per docs/API.md:
  * prompts and zod schemas belong next to the function that owns them.
  */
+/** One retry on malformed/invalid JSON — transient formatting slips are the common failure mode. */
 async function requestJson<T>(system: string, userPrompt: string, schema: z.ZodType<T>): Promise<T> {
+  try {
+    return await requestJsonOnce(system, userPrompt, schema);
+  } catch {
+    return requestJsonOnce(system, userPrompt, schema);
+  }
+}
+
+async function requestJsonOnce<T>(system: string, userPrompt: string, schema: z.ZodType<T>): Promise<T> {
   const response = await getClient().messages.create({
     model: MODEL_ID,
     max_tokens: 4096,
+    // Extraction/generation over a fixed transcript wants consistency across
+    // retries far more than creative variance.
+    temperature: 0.2,
     system,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -130,14 +151,24 @@ The learner's native language is ${nativeLang} and their CEFR level is ${level}.
 Extract up to 20 notable vocabulary words or short phrases as they literally appear in the
 transcript (so they can be located by substring search), across a mix of common and rare
 difficulty — a downstream step will filter by level, so include more than just ${level}-appropriate
-words. For each one, return:
+words. Rules:
+- List keywords in the order they appear in the transcript.
+- One entry per lemma: if a word recurs, include only its first occurrence.
+- Skip proper nouns (people, places, brands) and pure function words (articles, basic
+  prepositions, pronouns) — they teach nothing translatable.
+- Prefer words and short idiomatic phrases a learner would actually want to save to a
+  vocabulary deck.
+
+For each one, return:
 - "word": the exact surface form as it appears in the transcript
 - "lemma": its dictionary form
-- "translation": translation into ${nativeLang}
-- "exampleSentence": a short new example sentence in ${targetLang} using the word
+- "translation": translation into ${nativeLang}, matching the sense used in THIS transcript
+  (not the most common sense of the word in general)
+- "exampleSentence": a short new example sentence in ${targetLang} using the word in the same sense
 - "exampleTranslation": that example sentence translated into ${nativeLang}
 - "phonetic": a simple phonetic/pronunciation hint in ${nativeLang}-friendly notation, or null if not useful
-- "frequencyRank": an integer 0-4 rating rarity/difficulty (0 = very common/basic, 4 = rare/idiomatic)
+- "frequencyRank": an integer 0-4 rating rarity/difficulty, anchored to CEFR:
+  0 = A1 core vocabulary, 1 = A2, 2 = B1, 3 = B2, 4 = C1+/rare/idiomatic
 
 Reply with JSON: { "keywords": [ ... ] }`;
 
@@ -164,7 +195,13 @@ ${transcript}
 Write 2-3 multiple-choice comprehension questions about this passage, calibrated to a ${level}
 learner (question phrasing and choice complexity should match ${level}). Questions and choices
 should be in ${targetLang}; the explanation should be in ${nativeLang} so the learner understands
-the feedback. Each question needs 3-4 choices with exactly one correct answer.
+the feedback. Each question needs 3-4 choices with exactly one correct answer. Rules:
+- Test comprehension of what was said, not trivia recall of exact numbers or side details.
+- Wrong choices must be plausible (same topic, right grammatical form) but clearly wrong to
+  someone who understood the passage — never "all of the above" or joke options.
+- Vary the position of the correct answer across questions; do not always put it first.
+- The explanation should say WHY the answer is right, quoting or paraphrasing the relevant
+  part of the passage.
 
 Reply with JSON:
 {
@@ -192,11 +229,12 @@ export async function generateCloze(
 ${transcript}
 """
 
-Produce a cloze version of this transcript for a ${level} learner: replace a reasonable number of
-words (content words the learner should be able to infer or recall — not every word, and not
-purely function words) with the literal placeholder "___", keeping everything else, including
-punctuation, unchanged. "position" is the 0-indexed order of the blank within the transcript
-(0 = first blank, 1 = second blank, ...).
+Produce a cloze version of this transcript for a ${level} learner: replace content words the
+learner should be able to infer or recall — not every word, and not purely function words —
+with the literal placeholder "___" (exactly three underscores), keeping everything else,
+including punctuation, unchanged. Blank roughly one word per sentence for B1, slightly more
+for B2/C1. Every blank must have a matching entry in "answers", in order. "position" is the
+0-indexed order of the blank within the transcript (0 = first blank, 1 = second blank, ...).
 
 Reply with JSON:
 {
