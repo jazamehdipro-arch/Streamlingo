@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>StreamLingo</title>
+    <style>
+      body {
+        width: 260px;
+        margin: 0;
+        padding: 14px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #18181b;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 10px;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        margin-bottom: 12px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #a1a1aa;
+      }
+      .dot.paired {
+        background: #22c55e;
+      }
+      .dot.unpaired {
+        background: #ef4444;
+      }
+      fieldset {
+        border: none;
+        padding: 0;
+        margin: 0 0 12px;
+      }
+      legend {
+        font-size: 12px;
+        color: #52525b;
+        margin-bottom: 4px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 4px;
+      }
+      a {
+        color: #6366f1;
+        font-size: 13px;
+      }
+      button {
+        width: 100%;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 0;
+        font-size: 13px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StreamLingo</h1>
+    <div class="status">
+      <span id="status-dot" class="dot"></span>
+      <span id="status-text">Vérification…</span>
+    </div>
+
+    <fieldset id="position-field">
+      <legend>Position de l'overlay</legend>
+      <label><input type="radio" name="position" value="top-left" /> En haut à gauche</label>
+      <label><input type="radio" name="position" value="top-right" /> En haut à droite</label>
+    </fieldset>
+
+    <div id="unpaired-actions" hidden>
+      <p style="font-size: 12px; color: #52525b">
+        Associez l'extension depuis l'application web, puis collez le code sur la page des options.
+      </p>
+      <a id="connect-link" href="#" target="_blank" rel="noopener">Ouvrir la page de connexion</a>
+    </div>
+
+    <p><a id="options-link" href="#">Ouvrir les options</a></p>
+
+    <script src="index.js"></script>
+  </body>
+</html>

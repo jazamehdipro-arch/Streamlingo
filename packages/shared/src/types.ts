@@ -45,6 +45,8 @@ export interface KeywordCue {
   phonetic: string | null;
   startSeconds: number; // when it's spoken, for overlay sync
   frequencyRank: FrequencyRank;
+  /** True if this lemma was already in the user's vocab bank from a prior source. */
+  previouslyEncountered?: boolean;
 }
 
 export interface QuizQuestion {

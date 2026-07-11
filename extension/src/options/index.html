@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>StreamLingo — Options</title>
+    <style>
+      body {
+        max-width: 480px;
+        margin: 40px auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #18181b;
+        padding: 0 16px;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      p {
+        font-size: 13px;
+        line-height: 1.6;
+        color: #3f3f46;
+      }
+      input[type="text"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        font-size: 14px;
+        border: 1px solid #d4d4d8;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      }
+      button {
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #feedback {
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      #feedback.error {
+        color: #ef4444;
+      }
+      #feedback.success {
+        color: #22c55e;
+      }
+      a {
+        color: #6366f1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>StreamLingo</h1>
+    <p>
+      La première connexion nécessite d'avoir terminé l'inscription (langue cible, langue
+      maternelle, niveau CECR) sur l'application web. Ouvrez ensuite
+      <a id="connect-link" href="#" target="_blank" rel="noopener">la page de connexion</a>
+      pour obtenir un code d'association, puis collez-le ci-dessous.
+    </p>
+
+    <form id="pair-form">
+      <label for="code">Code d'association</label>
+      <input id="code" type="text" autocomplete="off" placeholder="ex : ABCD-1234" />
+      <button type="submit">Associer</button>
+    </form>
+
+    <div id="feedback"></div>
+
+    <script src="index.js"></script>
+  </body>
+</html>

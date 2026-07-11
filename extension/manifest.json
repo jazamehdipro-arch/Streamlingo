@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "StreamLingo",
+  "version": "0.1.0",
+  "description": "Turns YouTube videos into language-learning sessions without breaking immersion.",
+  "permissions": ["storage", "scripting", "activeTab"],
+  "host_permissions": [
+    "*://www.youtube.com/*",
+    "http://localhost:3000/*"
+  ],
+  "background": {
+    "service_worker": "background/index.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/watch*"],
+      "js": ["content/index.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_title": "StreamLingo"
+  },
+  "options_page": "options/index.html"
+}

@@ -42,6 +42,9 @@ filtered to the caller's level (`filterKeywordsForLevel` from `@streamlingo/shar
 persists the segment + cues, and upserts each lemma into the caller's `vocab_items`
 (incrementing `times_encountered` and inserting a `vocab_encounters` row if the
 lemma was already known — this is the cross-video "you've seen this word" signal).
+Each returned `KeywordCue` carries `previouslyEncountered: boolean`, set from that
+same upsert, so clients (extension overlay, web app) can badge it immediately
+without a second round-trip.
 
 ### `POST /api/segments/:segmentId/quiz`
 → `{ questions: QuizQuestion[] }` (2-3 questions, difficulty calibrated to level).
