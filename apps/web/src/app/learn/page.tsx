@@ -243,18 +243,18 @@ export default function LearnPage() {
     }
   }
 
-  if (profile === undefined) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </main>
-    );
-  }
-
   if (loadError && !profile) {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 text-center">
         <p className="text-sm text-red-600">{loadError}</p>
+      </main>
+    );
+  }
+
+  if (profile === undefined) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-neutral-500">Loading…</p>
       </main>
     );
   }

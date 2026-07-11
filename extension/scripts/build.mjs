@@ -34,6 +34,7 @@ async function copyStaticFiles() {
   await mkdir(path.join(outDir, "options"), { recursive: true });
   await cp(path.join(rootDir, "src/popup/index.html"), path.join(outDir, "popup/index.html"));
   await cp(path.join(rootDir, "src/options/index.html"), path.join(outDir, "options/index.html"));
+  await cp(path.join(rootDir, "icons"), path.join(outDir, "icons"), { recursive: true });
 
   const manifestRaw = await readFile(path.join(rootDir, "manifest.json"), "utf8");
   await writeFile(path.join(outDir, "manifest.json"), manifestRaw);

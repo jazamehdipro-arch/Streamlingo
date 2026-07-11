@@ -36,3 +36,19 @@ collée manuellement pour la web app, sous-titres YouTube pour l'extension —
 voir `docs/RISKS.md` pour les limites connues). Pas encore production-ready :
 pas de vrai fournisseur STT branché, alignement mot/audio approximatif,
 pairing extension à durcir.
+
+Testé en conditions réelles dans ce dépôt (Chromium local, sans clés
+Supabase/Anthropic réelles) :
+- L'extension se charge sans erreur (service worker, popup, options) —
+  YouTube lui-même n'a pas pu être testé, bloqué par la politique réseau de
+  l'environnement de build, pas par un bug du code.
+- La web app démarre et sert toutes les pages ; un bug réel a été trouvé et
+  corrigé (`/learn` restait bloqué sur "Loading…" au lieu d'afficher l'erreur
+  quand `/api/profile` échoue).
+- CI GitHub Actions (`.github/workflows/ci.yml`) build les deux workspaces à
+  chaque push/PR pour éviter les régressions silencieuses.
+
+Reste à faire avant un vrai lancement : provisionner un projet Supabase réel
+et une clé Anthropic (aucun outil ne peut le faire à ma place — ce sont des
+comptes/paiements qui appartiennent à l'utilisateur), puis tester
+l'extension sur une vraie page YouTube.
