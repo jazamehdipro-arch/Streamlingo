@@ -12,6 +12,7 @@
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
     "*://www.youtube.com/*",
+    "https://streamlingo-web.vercel.app/*",
     "http://localhost:3000/*"
   ],
   "background": {

@@ -8,14 +8,14 @@
  * or every fetch the background worker makes will be silently rejected by
  * Chrome/Firefox before it leaves the browser.
  */
-export const API_BASE_URL = "http://localhost:3000";
+export const API_BASE_URL = "https://streamlingo-web.vercel.app";
 
 /**
  * The web app also hosts onboarding + the pairing-code screen. Same origin
  * as the API in dev; kept as a separate constant because a production
  * deployment could plausibly split API and web app onto different hosts.
  */
-export const WEB_APP_BASE_URL = "http://localhost:3000";
+export const WEB_APP_BASE_URL = "https://streamlingo-web.vercel.app";
 
 export const CONNECT_EXTENSION_PATH = "/connect-extension";
 
