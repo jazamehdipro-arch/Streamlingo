@@ -14,10 +14,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setLoading(true);
     try {
       const supabase = getBrowserSupabase();
@@ -26,6 +28,18 @@ export default function LoginPage() {
           ? await supabase.auth.signInWithPassword({ email, password })
           : await supabase.auth.signUp({ email, password });
       if (authError) throw authError;
+
+      // Supabase's default "confirm email" setting returns no session on
+      // sign-up: the account exists but is unusable until the emailed link
+      // is clicked. Without this branch the user lands on /onboarding
+      // unauthenticated and gets a bare "Unauthorized".
+      if (!data.session) {
+        setMode("login");
+        setInfo(
+          "Compte créé ! Vérifie ta boîte mail et clique sur le lien de confirmation, puis connecte-toi ici."
+        );
+        return;
+      }
 
       syncSessionCookie(data.session);
       router.push("/onboarding");
@@ -61,6 +75,12 @@ export default function LoginPage() {
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </p>
+      )}
+
+      {info && (
+        <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          {info}
         </p>
       )}
 
