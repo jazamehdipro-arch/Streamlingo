@@ -197,7 +197,9 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   const cues = await fetchCaptionCues(videoId, profile.targetLanguage).catch(() => null);
   if (isStale()) return;
   if (!cues) {
-    activeOverlay.showNotice("Pas de sous-titres disponibles pour cette vidéo.");
+    activeOverlay.showNotice(
+      "Pas de sous-titres accessibles pour cette vidéo (détails techniques dans la console : F12 → Console, filtre StreamLingo)."
+    );
     return;
   }
 
