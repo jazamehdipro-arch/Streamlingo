@@ -33,12 +33,17 @@ function ensureOverlay(position: OverlayPosition): Overlay {
   return overlay;
 }
 
+function log(...args: unknown[]): void {
+  console.warn("[StreamLingo]", ...args);
+}
+
 async function loadProfile(): Promise<UserProfile | null> {
   if (profileCache) return profileCache;
   try {
     profileCache = await api.getProfile();
     return profileCache;
-  } catch {
+  } catch (err) {
+    log("profile fetch failed", err);
     return null;
   }
 }
@@ -58,8 +63,29 @@ async function postSegment(currentSession: VideoSession, index: number): Promise
       cues: local.cues,
     });
     currentSession.postedByIndex.set(index, { local, backend: segment, keywordCues });
-  } catch {
-    // Left un-posted; the next timeupdate crossing this segment retries.
+    log(`segment ${index} analysé : ${keywordCues.length} mot(s)-clé(s)`);
+    if (index === 0 && keywordCues.length === 0) {
+      overlay?.showNotice(
+        "StreamLingo : passage analysé mais aucun mot-clé au-dessus de ton niveau dans ce passage."
+      );
+    }
+  } catch (err) {
+    // Left un-posted; the next timeupdate crossing this segment retries —
+    // but silently swallowing this made real failures (server unreachable,
+    // token expired) indistinguishable from "working, just slow" in the field.
+    log(`segment ${index} : échec de l'analyse`, err);
+    const status = err instanceof api.ApiError ? err.status : undefined;
+    if (status === 401) {
+      overlay?.showNotice(
+        "StreamLingo : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options).",
+        12000
+      );
+    } else if (index === 0) {
+      overlay?.showNotice(
+        `StreamLingo : le serveur n'a pas répondu (${status ?? "réseau"}) — nouvel essai automatique pendant la lecture.`,
+        10000
+      );
+    }
   } finally {
     currentSession.postingIndexes.delete(index);
   }
@@ -209,13 +235,28 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
     return;
   }
 
-  const source = await api.createSource({
-    kind: "youtube",
-    externalId: videoId,
-    title: document.title.replace(/ - YouTube$/, ""),
-    durationSeconds: Number.isFinite(video.duration) ? Math.round(video.duration) : undefined,
-  });
+  let source;
+  try {
+    source = await api.createSource({
+      kind: "youtube",
+      externalId: videoId,
+      title: document.title.replace(/ - YouTube$/, ""),
+      durationSeconds: Number.isFinite(video.duration) ? Math.round(video.duration) : undefined,
+    });
+  } catch (err) {
+    log("createSource failed", err);
+    const status = err instanceof api.ApiError ? err.status : undefined;
+    activeOverlay.showNotice(
+      status === 401
+        ? "StreamLingo : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options)."
+        : `StreamLingo : impossible de joindre le serveur (${status ?? "réseau"}). Recharge la page pour réessayer.`,
+      12000
+    );
+    return;
+  }
   if (isStale()) return;
+  log(`session démarrée : ${localSegments.length} segment(s), analyse IA du premier passage…`);
+  activeOverlay.showNotice("StreamLingo actif ✓ — analyse du premier passage en cours…");
 
   const newSession = new VideoSession(videoId, profile);
   newSession.source = source;
