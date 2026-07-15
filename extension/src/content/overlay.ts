@@ -437,6 +437,48 @@ export class Overlay {
     this.sessionPanelEl = null;
   }
 
+  /**
+   * Non-blocking near-end invitation to the recap — a modal a minute before
+   * the end would cut off the video's conclusion, so this is a dismissable
+   * prompt and the full modal only opens on click (or at actual video end).
+   */
+  showRecapPrompt(onDismiss: () => void): void {
+    if (this.sessionWords.length === 0) return;
+    this.promptEl?.remove();
+    const el = document.createElement("div");
+    el.className = "prompt";
+
+    const n = this.sessionWords.length;
+    const text = document.createElement("span");
+    text.textContent = `\ud83c\udfac Bient\u00f4t fini \u2014 ${n} mot${n > 1 ? "s" : ""} rencontr\u00e9${n > 1 ? "s" : ""} dans cette vid\u00e9o.`;
+    el.appendChild(text);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "sl-btn";
+    openBtn.textContent = "Voir mes mots";
+    openBtn.addEventListener("click", () => {
+      this.hideSegmentPrompt();
+      this.showRecap();
+    });
+    actions.appendChild(openBtn);
+
+    const dismissBtn = document.createElement("button");
+    dismissBtn.className = "sl-btn secondary";
+    dismissBtn.textContent = "Non merci";
+    dismissBtn.addEventListener("click", () => {
+      this.hideSegmentPrompt();
+      onDismiss();
+    });
+    actions.appendChild(dismissBtn);
+
+    el.appendChild(actions);
+    this.promptEl = el;
+    this.root.appendChild(el);
+  }
+
   /** End-of-video recap: every word encountered, clickable chips, per spec's "after the video" moment. */
   showRecap(): void {
     if (this.sessionWords.length === 0) return;

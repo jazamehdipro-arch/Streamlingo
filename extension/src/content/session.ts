@@ -25,6 +25,9 @@ export class VideoSession {
   lastKnownSegmentIndex = -1;
   /** Lemmas marked "known" during this session — filtered client-side immediately. */
   knownLemmas = new Set<string>();
+  /** Near-end recap prompt shown once per video; dismissal also suppresses the end-of-video modal. */
+  recapPromptShown = false;
+  recapDismissed = false;
 
   constructor(videoId: string, profile: UserProfile) {
     this.videoId = videoId;

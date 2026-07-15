@@ -216,6 +216,21 @@ function onTimeUpdate(currentSession: VideoSession, video: HTMLVideoElement): vo
   const posted = currentSession.postedByIndex.get(segmentIndex);
   if (!posted || !overlay) return;
 
+  // One minute before the end (nobody watches to the last second), offer the
+  // recap without blocking playback. Skipped for videos under two minutes,
+  // where "one minute before the end" is just the middle of the video.
+  if (
+    !currentSession.recapPromptShown &&
+    Number.isFinite(video.duration) &&
+    video.duration > 120 &&
+    video.duration - currentTime <= 60
+  ) {
+    currentSession.recapPromptShown = true;
+    overlay.showRecapPrompt(() => {
+      currentSession.recapDismissed = true;
+    });
+  }
+
   // Freshness window: a cue whose moment passed more than a few seconds ago
   // (analysis returned late, or the user seeked) is consumed WITHOUT being
   // displayed — dumping a backlog of stale words all at once reads as
@@ -321,7 +336,7 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   });
 
   video.addEventListener("ended", () => {
-    if (session === newSession) overlay?.showRecap();
+    if (session === newSession && !newSession.recapDismissed) overlay?.showRecap();
   });
 
   void postSegment(newSession, 0);
