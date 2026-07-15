@@ -89,9 +89,8 @@ async function requestJsonOnce<T>(system: string, userPrompt: string, schema: z.
   const response = await getClient().messages.create({
     model: MODEL_ID,
     max_tokens: 4096,
-    // Extraction/generation over a fixed transcript wants consistency across
-    // retries far more than creative variance.
-    temperature: 0.2,
+    // No temperature: claude-sonnet-5 rejects the parameter outright
+    // ("temperature is deprecated for this model") — passing it 400s every call.
     system,
     messages: [{ role: "user", content: userPrompt }],
   });

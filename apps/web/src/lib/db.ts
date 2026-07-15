@@ -115,6 +115,24 @@ export async function recordVocabEncounter(
       })
       .select("id")
       .single();
+
+    if (error?.code === "23505") {
+      // Lost the race described above (two segments analyzed concurrently,
+      // same lemma): the row exists now — treat it as an existing encounter.
+      const { data: raced } = await supabase
+        .from("vocab_items")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("lemma", cue.lemma)
+        .single();
+      if (!raced) throw new Error(`vocab_items race lost and re-read failed for lemma ${cue.lemma}`);
+      await supabase.from("vocab_encounters").insert({
+        vocab_item_id: raced.id as string,
+        source_id: sourceId,
+      });
+      return { previouslyEncountered: true };
+    }
+
     if (error || !inserted) {
       throw new Error(`Failed to insert vocab_items row: ${error?.message ?? "unknown error"}`);
     }

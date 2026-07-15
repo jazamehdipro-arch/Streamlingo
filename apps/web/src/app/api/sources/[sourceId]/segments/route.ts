@@ -123,8 +123,14 @@ export async function POST(
       else byLemma.set(cue.lemma, [cue]);
     }
     for (const [, group] of byLemma) {
-      const { previouslyEncountered } = await recordVocabEncounter(supabase, userId, sourceId, group[0]);
-      for (const cue of group) cue.previouslyEncountered = previouslyEncountered;
+      // Vocab bookkeeping must never fail the cue response — the overlay is
+      // the product; the bank silently catches up on the next encounter.
+      try {
+        const { previouslyEncountered } = await recordVocabEncounter(supabase, userId, sourceId, group[0]);
+        for (const cue of group) cue.previouslyEncountered = previouslyEncountered;
+      } catch (err) {
+        console.error(`recordVocabEncounter failed for lemma ${group[0].lemma}:`, err);
+      }
     }
   }
 
