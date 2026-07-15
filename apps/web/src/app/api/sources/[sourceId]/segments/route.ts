@@ -74,12 +74,21 @@ export async function POST(
 
   if (segmentError || !segmentRow) return serverError(segmentError?.message);
 
-  const rawKeywords = await extractKeywords(
-    transcript,
-    profile.level,
-    profile.targetLanguage,
-    profile.nativeLanguage
-  );
+  let rawKeywords;
+  try {
+    rawKeywords = await extractKeywords(
+      transcript,
+      profile.level,
+      profile.targetLanguage,
+      profile.nativeLanguage
+    );
+  } catch (err) {
+    // Without this, an LLM failure surfaces as a bare Next.js 500 with no
+    // body — undiagnosable from the extension console in the field.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("extractKeywords failed:", message);
+    return serverError(`LLM keyword extraction failed: ${message}`);
+  }
   const timedCues = estimateWordTimings(transcript, startSeconds, endSeconds, rawKeywords, cues);
   const filteredCues = filterKeywordsForLevel(timedCues, profile.level);
 
