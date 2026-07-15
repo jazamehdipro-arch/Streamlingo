@@ -95,6 +95,16 @@ export function getReplay(segmentId: string): Promise<{ transcript: string; tran
   return request<{ transcript: string; translation: string }>("POST", `/api/segments/${segmentId}/replay`);
 }
 
+export function markKnown(cue: {
+  lemma: string;
+  translation: string;
+  exampleSentence: string;
+  exampleTranslation: string;
+  phonetic: string | null;
+}): Promise<{ known: true; lemma: string }> {
+  return request<{ known: true; lemma: string }>("POST", "/api/vocab/known", cue);
+}
+
 export function getVocab(): Promise<{ items: Array<{ srs: { dueAt: string } }> }> {
   return request<{ items: Array<{ srs: { dueAt: string } }> }>("GET", "/api/vocab");
 }

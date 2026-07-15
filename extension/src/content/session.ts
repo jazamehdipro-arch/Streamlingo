@@ -23,6 +23,8 @@ export class VideoSession {
   promptedIndexes = new Set<number>();
   clozeActiveForIndex: number | null = null;
   lastKnownSegmentIndex = -1;
+  /** Lemmas marked "known" during this session — filtered client-side immediately. */
+  knownLemmas = new Set<string>();
 
   constructor(videoId: string, profile: UserProfile) {
     this.videoId = videoId;

@@ -41,6 +41,9 @@ export async function GET(req: NextRequest) {
   for (const row of vocabRows ?? []) {
     const srsRow = srsByVocabId.get(row.id);
     if (!srsRow) continue;
+    // Words marked "known" leave the review loop entirely. Read defensively:
+    // the column arrives with migration 0003 and older DBs simply lack it.
+    if (due && (row as { known?: boolean }).known === true) continue;
     const srs = mapSrsState(srsRow);
     if (due && new Date(srs.dueAt).getTime() > now) continue;
     items.push({ ...mapVocabItem(row), srs });

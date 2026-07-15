@@ -11,8 +11,8 @@ function isPreviouslyEncountered(cue: KeywordCue): boolean {
 const STYLES = `
   :host { all: initial; }
   .root {
-    position: fixed;
-    top: 16px;
+    position: absolute;
+    top: 60px;
     z-index: 2147483647;
     display: flex;
     flex-direction: column;
@@ -23,8 +23,8 @@ const STYLES = `
   }
   .root.pos-top-left { left: 16px; align-items: flex-start; }
   .root.pos-top-right { right: 16px; align-items: flex-end; }
-  .root.pos-bottom-left { top: auto; bottom: 80px; left: 16px; align-items: flex-start; flex-direction: column-reverse; }
-  .root.pos-bottom-right { top: auto; bottom: 80px; right: 16px; align-items: flex-end; flex-direction: column-reverse; }
+  .root.pos-bottom-left { top: auto; bottom: 70px; left: 16px; align-items: flex-start; flex-direction: column-reverse; }
+  .root.pos-bottom-right { top: auto; bottom: 70px; right: 16px; align-items: flex-end; flex-direction: column-reverse; }
 
   .header {
     pointer-events: auto;
@@ -290,10 +290,16 @@ export class Overlay {
   private enabled = true;
   private onModalClose: (() => void) | null = null;
   private onWordExpand: ((cue: KeywordCue) => void) | null = null;
+  private onMarkKnown: ((cue: KeywordCue) => Promise<void>) | null = null;
 
-  constructor(position: OverlayPosition) {
+  constructor(position: OverlayPosition, container?: HTMLElement) {
     this.host = document.createElement("div");
     this.host.id = "streamlingo-overlay-host";
+    // Anchored inside the YouTube player (position:relative) so the overlay
+    // sits ON the video — visible without looking away — and survives
+    // fullscreen. Falls back to <body> if the player isn't found.
+    this.host.style.cssText =
+      "position:absolute;inset:0;pointer-events:none;z-index:2147483647;";
     this.shadow = this.host.attachShadow({ mode: "open" });
 
     const style = document.createElement("style");
@@ -327,12 +333,37 @@ export class Overlay {
 
     this.root.appendChild(this.headerEl);
 
-    document.body.appendChild(this.host);
+    (container ?? document.body).appendChild(this.host);
+  }
+
+  /** True while the host is still attached to a live DOM (YouTube re-renders can detach it). */
+  isMounted(): boolean {
+    return this.host.isConnected;
+  }
+
+  destroy(): void {
+    this.host.remove();
   }
 
   /** Registered by the content script so session-panel and recap word chips reuse the same popover. */
   setWordExpandHandler(handler: (cue: KeywordCue) => void): void {
     this.onWordExpand = handler;
+  }
+
+  /** Registered by the content script: "je connais ce mot" in the popover. */
+  setMarkKnownHandler(handler: (cue: KeywordCue) => Promise<void>): void {
+    this.onMarkKnown = handler;
+  }
+
+  /** Removes every visible trace of a lemma (cards + session list) after it's marked known. */
+  forgetLemma(lemma: string): void {
+    this.sessionWords = this.sessionWords.filter((w) => w.lemma !== lemma);
+    const n = this.sessionWords.length;
+    this.counterBtn.textContent = `${n} mot${n > 1 ? "s" : ""}`;
+    for (const card of Array.from(this.root.querySelectorAll(".card"))) {
+      if ((card as HTMLElement).dataset.lemma === lemma) card.remove();
+    }
+    this.hideSessionPanel();
   }
 
   setEnabled(enabled: boolean): void {
@@ -474,6 +505,7 @@ export class Overlay {
     if (!this.enabled) return;
     const card = document.createElement("div");
     card.className = "card";
+    card.dataset.lemma = cue.lemma;
 
     const wordEl = document.createElement("span");
     wordEl.className = "word";
@@ -542,6 +574,27 @@ export class Overlay {
 
     const closeRow = document.createElement("div");
     closeRow.className = "close-row";
+
+    if (this.onMarkKnown) {
+      const knownBtn = document.createElement("button");
+      knownBtn.className = "sl-btn secondary";
+      knownBtn.textContent = "✓ Je connais ce mot";
+      knownBtn.title = "Ne plus jamais afficher ce mot";
+      knownBtn.addEventListener("click", async () => {
+        knownBtn.disabled = true;
+        knownBtn.textContent = "…";
+        try {
+          await this.onMarkKnown?.(cue);
+          this.closeModal();
+          this.showNotice(`« ${cue.word} » ne sera plus affiché.`, 4000);
+        } catch {
+          knownBtn.disabled = false;
+          knownBtn.textContent = "✓ Je connais ce mot";
+          this.showNotice("Impossible d'enregistrer — réessaie.", 4000);
+        }
+      });
+      closeRow.appendChild(knownBtn);
+    }
 
     if (onReplay) {
       const replayBtn = document.createElement("button");

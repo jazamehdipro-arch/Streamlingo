@@ -93,7 +93,23 @@ export async function POST(
     return serverError(`LLM keyword extraction failed: ${message}`);
   }
   const timedCues = estimateWordTimings(transcript, startSeconds, endSeconds, rawKeywords, cues);
-  const filteredCues = filterKeywordsForLevel(timedCues, profile.level);
+  let filteredCues = filterKeywordsForLevel(timedCues, profile.level);
+
+  // Drop words the user marked as known — they must never resurface in the
+  // overlay. Fail-open: if the `known` column doesn't exist yet (migration
+  // 0003 not applied), keep every cue rather than erroring the analyze call.
+  if (filteredCues.length > 0) {
+    const { data: knownRows } = await supabase
+      .from("vocab_items")
+      .select("lemma")
+      .eq("user_id", userId)
+      .eq("known", true)
+      .in("lemma", filteredCues.map((c) => c.lemma));
+    if (knownRows && knownRows.length > 0) {
+      const knownLemmas = new Set(knownRows.map((r) => r.lemma as string));
+      filteredCues = filteredCues.filter((c) => !knownLemmas.has(c.lemma));
+    }
+  }
 
   await supabase.from("keyword_cues").delete().eq("segment_id", segmentRow.id);
 

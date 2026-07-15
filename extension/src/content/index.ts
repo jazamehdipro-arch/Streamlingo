@@ -32,8 +32,14 @@ async function shouldPauseOnPopover(): Promise<boolean> {
 }
 
 function ensureOverlay(position: OverlayPosition): Overlay {
+  const player = document.querySelector<HTMLElement>("#movie_player");
+  if (overlay && !overlay.isMounted()) {
+    // YouTube re-rendered the player subtree and dropped our host.
+    overlay.destroy();
+    overlay = null;
+  }
   if (!overlay) {
-    overlay = new Overlay(position);
+    overlay = new Overlay(position, player ?? undefined);
   } else {
     overlay.setPosition(position);
   }
@@ -209,6 +215,7 @@ function onTimeUpdate(currentSession: VideoSession, video: HTMLVideoElement): vo
   if (!posted || !overlay) return;
 
   for (const cue of posted.keywordCues) {
+    if (currentSession.knownLemmas.has(cue.lemma)) continue;
     const key = cueKey(segmentIndex, cue);
     if (currentSession.shownCueKeys.has(key)) continue;
     if (currentTime >= cue.startSeconds) {
@@ -240,6 +247,17 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   }
   activeOverlay.setLanguage(profile.targetLanguage);
   activeOverlay.setWordExpandHandler((cue) => openCuePopover(cue));
+  activeOverlay.setMarkKnownHandler(async (cue) => {
+    await api.markKnown({
+      lemma: cue.lemma,
+      translation: cue.translation,
+      exampleSentence: cue.exampleSentence,
+      exampleTranslation: cue.exampleTranslation,
+      phonetic: cue.phonetic,
+    });
+    session?.knownLemmas.add(cue.lemma);
+    activeOverlay.forgetLemma(cue.lemma);
+  });
 
   const video = await waitForVideoElement();
   if (isStale() || !video) return;
