@@ -8,6 +8,9 @@ import { generateCloze } from "@/lib/llm";
 import { mapClozeItem, type ClozeItemRow } from "@/lib/mappers";
 
 export const runtime = "nodejs";
+// LLM calls routinely take 15-30s; Vercel's default function timeout kills
+// them mid-flight as an opaque 500. 60s is the Hobby-plan ceiling.
+export const maxDuration = 60;
 
 export async function POST(
   req: NextRequest,

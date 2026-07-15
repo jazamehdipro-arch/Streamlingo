@@ -10,6 +10,9 @@ import { recordVocabEncounter, fetchProfile } from "@/lib/db";
 import { mapSegment, type SegmentRow } from "@/lib/mappers";
 
 export const runtime = "nodejs";
+// LLM calls routinely take 15-30s; Vercel's default function timeout kills
+// them mid-flight as an opaque 500. 60s is the Hobby-plan ceiling.
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   index: z.number().int().min(0),
