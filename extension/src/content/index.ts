@@ -188,9 +188,11 @@ function onTimeUpdate(currentSession: VideoSession, video: HTMLVideoElement): vo
     currentSession.lastKnownSegmentIndex = segmentIndex;
 
     void postSegment(currentSession, segmentIndex);
-    // Prefetch the next segment slightly ahead so its keyword cues are
-    // likely to have arrived by the time playback reaches it.
+    // Prefetch two segments ahead: analysis takes seconds, and cues that
+    // arrive after their moment has passed are dropped by the freshness
+    // window below — lead time is what makes sync feel instant.
     void postSegment(currentSession, segmentIndex + 1);
+    void postSegment(currentSession, segmentIndex + 2);
 
     deactivateClozeIfNeeded(currentSession, segmentIndex);
 
@@ -214,13 +216,21 @@ function onTimeUpdate(currentSession: VideoSession, video: HTMLVideoElement): vo
   const posted = currentSession.postedByIndex.get(segmentIndex);
   if (!posted || !overlay) return;
 
+  // Freshness window: a cue whose moment passed more than a few seconds ago
+  // (analysis returned late, or the user seeked) is consumed WITHOUT being
+  // displayed — dumping a backlog of stale words all at once reads as
+  // "broken sync", the exact opposite of the product's core promise. The
+  // word is still in the vocab bank and the session panel regardless.
+  const FRESHNESS_SECONDS = 5;
   for (const cue of posted.keywordCues) {
     if (currentSession.knownLemmas.has(cue.lemma)) continue;
     const key = cueKey(segmentIndex, cue);
     if (currentSession.shownCueKeys.has(key)) continue;
     if (currentTime >= cue.startSeconds) {
       currentSession.shownCueKeys.add(key);
-      overlay.showCue(cue, (c) => onCueExpand(currentSession, segmentIndex, c));
+      if (currentTime - cue.startSeconds <= FRESHNESS_SECONDS) {
+        overlay.showCue(cue, (c) => onCueExpand(currentSession, segmentIndex, c));
+      }
     }
   }
 }
@@ -315,6 +325,7 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   });
 
   void postSegment(newSession, 0);
+  void postSegment(newSession, 1);
 }
 
 async function handleVideoChange(): Promise<void> {

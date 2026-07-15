@@ -66,6 +66,14 @@ function check(label, fn) {
     const [k] = estimateWordTimings(transcript, 10, 23, [kw("fantôme")], cues);
     assert.ok(within(k, 10, 23));
   });
+  check("overlapping ASR cue durations don't push timing past the next cue", () => {
+    const overlapping = [
+      { text: "the quick brown fox", startSeconds: 0, durSeconds: 6 },
+      { text: "jumps over the lazy dog", startSeconds: 2, durSeconds: 6 },
+    ];
+    const [k] = estimateWordTimings("the quick brown fox jumps over the lazy dog", 0, 8, [kw("fox")], overlapping);
+    assert.ok(k.startSeconds < 2, `fox timed at ${k.startSeconds}, expected before next cue at 2s`);
+  });
 }
 
 // ---- SM-2 ----

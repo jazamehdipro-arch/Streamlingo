@@ -3,6 +3,10 @@ import { z } from "zod";
 import type { CefrLevel, ClozeItem, KeywordCue, QuizQuestion } from "@streamlingo/shared";
 
 const MODEL_ID = "claude-sonnet-5";
+// Keyword extraction is on the hot path of overlay sync (a segment's words
+// can't show until it returns); Haiku cuts that wall-clock wait ~3x and is
+// fully adequate for extract+translate. Quiz/cloze/replay stay on Sonnet.
+const FAST_MODEL_ID = "claude-haiku-4-5-20251001";
 
 let client: Anthropic | null = null;
 
@@ -77,17 +81,27 @@ const replayResponseSchema = z.object({
  * prompts and zod schemas belong next to the function that owns them.
  */
 /** One retry on malformed/invalid JSON — transient formatting slips are the common failure mode. */
-async function requestJson<T>(system: string, userPrompt: string, schema: z.ZodType<T>): Promise<T> {
+async function requestJson<T>(
+  system: string,
+  userPrompt: string,
+  schema: z.ZodType<T>,
+  model: string = MODEL_ID
+): Promise<T> {
   try {
-    return await requestJsonOnce(system, userPrompt, schema);
+    return await requestJsonOnce(system, userPrompt, schema, model);
   } catch {
-    return requestJsonOnce(system, userPrompt, schema);
+    return requestJsonOnce(system, userPrompt, schema, model);
   }
 }
 
-async function requestJsonOnce<T>(system: string, userPrompt: string, schema: z.ZodType<T>): Promise<T> {
+async function requestJsonOnce<T>(
+  system: string,
+  userPrompt: string,
+  schema: z.ZodType<T>,
+  model: string
+): Promise<T> {
   const response = await getClient().messages.create({
-    model: MODEL_ID,
+    model,
     max_tokens: 4096,
     // No temperature: claude-sonnet-5 rejects the parameter outright
     // ("temperature is deprecated for this model") — passing it 400s every call.
@@ -171,7 +185,7 @@ For each one, return:
 
 Reply with JSON: { "keywords": [ ... ] }`;
 
-  const result = await requestJson(system, prompt, extractKeywordsResponseSchema);
+  const result = await requestJson(system, prompt, extractKeywordsResponseSchema, FAST_MODEL_ID);
   return result.keywords;
 }
 

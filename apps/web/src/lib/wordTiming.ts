@@ -40,6 +40,14 @@ function anchorToCues(
 ): KeywordCue[] {
   const sorted = [...cues].sort((a, b) => a.startSeconds - b.startSeconds);
   const lowered = sorted.map((cue) => cue.text.toLowerCase());
+  // YouTube ASR cues routinely overlap the next cue (rolling captions), so a
+  // raw durSeconds pushes offsets later than the words are actually spoken.
+  // The speech window for a cue's text is really "until the next cue starts".
+  const effectiveDur = sorted.map((cue, i) => {
+    const next = sorted[i + 1];
+    const gap = next ? next.startSeconds - cue.startSeconds : cue.durSeconds;
+    return Math.max(0.4, Math.min(cue.durSeconds, gap));
+  });
   // Track consumption per cue so a keyword repeated in the same cue, or the
   // same keyword appearing in two cues, advances instead of piling onto the
   // first occurrence.
@@ -65,7 +73,7 @@ function anchorToCues(
         const fractionInCue = cue.text.length > 0 ? at / cue.text.length : 0;
         return {
           ...keyword,
-          startSeconds: cue.startSeconds + fractionInCue * cue.durSeconds,
+          startSeconds: cue.startSeconds + fractionInCue * effectiveDur[c],
         };
       }
     }

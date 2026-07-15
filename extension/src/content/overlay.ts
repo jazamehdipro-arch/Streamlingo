@@ -2,7 +2,7 @@ import type { ClozeItem, KeywordCue, QuizQuestion } from "@streamlingo/shared";
 
 export type OverlayPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
-const CUE_VISIBLE_SECONDS = 4;
+const CUE_VISIBLE_SECONDS = 6;
 
 function isPreviouslyEncountered(cue: KeywordCue): boolean {
   return cue.previouslyEncountered === true;
