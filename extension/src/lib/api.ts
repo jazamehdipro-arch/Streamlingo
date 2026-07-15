@@ -94,3 +94,7 @@ export function getCloze(segmentId: string): Promise<ClozeItem> {
 export function getReplay(segmentId: string): Promise<{ transcript: string; translation: string }> {
   return request<{ transcript: string; translation: string }>("POST", `/api/segments/${segmentId}/replay`);
 }
+
+export function getVocab(): Promise<{ items: Array<{ srs: { dueAt: string } }> }> {
+  return request<{ items: Array<{ srs: { dueAt: string } }> }>("GET", "/api/vocab");
+}

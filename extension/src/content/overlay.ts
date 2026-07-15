@@ -1,6 +1,6 @@
 import type { ClozeItem, KeywordCue, QuizQuestion } from "@streamlingo/shared";
 
-export type OverlayPosition = "top-left" | "top-right";
+export type OverlayPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 const CUE_VISIBLE_SECONDS = 4;
 
@@ -23,6 +23,119 @@ const STYLES = `
   }
   .root.pos-top-left { left: 16px; align-items: flex-start; }
   .root.pos-top-right { right: 16px; align-items: flex-end; }
+  .root.pos-bottom-left { top: auto; bottom: 80px; left: 16px; align-items: flex-start; flex-direction: column-reverse; }
+  .root.pos-bottom-right { top: auto; bottom: 80px; right: 16px; align-items: flex-end; flex-direction: column-reverse; }
+
+  .header {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(16, 16, 20, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #e4e4e7;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .header .brand {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .header .brand .logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: #818cf8;
+    color: #0f0f13;
+    border-radius: 5px;
+    font-size: 9px;
+  }
+  .header .counter {
+    background: rgba(129, 140, 248, 0.18);
+    color: #c7d2fe;
+    border: none;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .header .counter:hover { background: rgba(129, 140, 248, 0.32); }
+  .header .toggle {
+    background: none;
+    border: none;
+    color: #a1a1aa;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .header .toggle:hover { color: #f4f4f5; }
+
+  .session-panel {
+    pointer-events: auto;
+    background: rgba(16, 16, 20, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    width: 280px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .session-panel .panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #a1a1aa;
+    margin: 2px 4px 8px;
+  }
+  .session-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #f4f4f5;
+    cursor: pointer;
+  }
+  .session-row:hover { background: rgba(255,255,255,0.06); }
+  .session-row .w { font-weight: 600; }
+  .session-row .t { color: #c7d2fe; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-row .speak {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    opacity: 0.7;
+  }
+  .session-row .speak:hover { opacity: 1; }
+
+  .recap-word {
+    display: inline-block;
+    background: rgba(129, 140, 248, 0.15);
+    border: 1px solid rgba(129, 140, 248, 0.35);
+    color: #e0e7ff;
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin: 3px 4px 3px 0;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .recap-word:hover { background: rgba(129, 140, 248, 0.3); }
 
   .card {
     pointer-events: auto;
@@ -169,6 +282,14 @@ export class Overlay {
   private clozePanelEl: HTMLDivElement | null = null;
   private modalBackdrop: HTMLDivElement | null = null;
   private language: string | null = null;
+  private headerEl: HTMLDivElement;
+  private counterBtn: HTMLButtonElement;
+  private toggleBtn: HTMLButtonElement;
+  private sessionPanelEl: HTMLDivElement | null = null;
+  private sessionWords: KeywordCue[] = [];
+  private enabled = true;
+  private onModalClose: (() => void) | null = null;
+  private onWordExpand: ((cue: KeywordCue) => void) | null = null;
 
   constructor(position: OverlayPosition) {
     this.host = document.createElement("div");
@@ -183,7 +304,144 @@ export class Overlay {
     this.root.className = `root pos-${position}`;
     this.shadow.appendChild(this.root);
 
+    this.headerEl = document.createElement("div");
+    this.headerEl.className = "header";
+    const brand = document.createElement("span");
+    brand.className = "brand";
+    brand.innerHTML = '<span class="logo">\u25b6</span>StreamLingo';
+    this.headerEl.appendChild(brand);
+
+    this.counterBtn = document.createElement("button");
+    this.counterBtn.className = "counter";
+    this.counterBtn.textContent = "0 mot";
+    this.counterBtn.title = "Voir les mots de cette session";
+    this.counterBtn.addEventListener("click", () => this.toggleSessionPanel());
+    this.headerEl.appendChild(this.counterBtn);
+
+    this.toggleBtn = document.createElement("button");
+    this.toggleBtn.className = "toggle";
+    this.toggleBtn.textContent = "\ud83d\udc41";
+    this.toggleBtn.title = "Activer / d\u00e9sactiver l'overlay pour cette vid\u00e9o";
+    this.toggleBtn.addEventListener("click", () => this.setEnabled(!this.enabled));
+    this.headerEl.appendChild(this.toggleBtn);
+
+    this.root.appendChild(this.headerEl);
+
     document.body.appendChild(this.host);
+  }
+
+  /** Registered by the content script so session-panel and recap word chips reuse the same popover. */
+  setWordExpandHandler(handler: (cue: KeywordCue) => void): void {
+    this.onWordExpand = handler;
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    this.toggleBtn.textContent = enabled ? "\ud83d\udc41" : "\ud83d\ude48";
+    this.toggleBtn.style.opacity = enabled ? "1" : "0.5";
+    if (!enabled) {
+      for (const card of Array.from(this.root.querySelectorAll(".card"))) card.remove();
+      this.hideSessionPanel();
+    }
+  }
+
+  getSessionWords(): KeywordCue[] {
+    return [...this.sessionWords];
+  }
+
+  private speakWord(word: string): void {
+    window.speechSynthesis?.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = this.language ?? "en";
+    utterance.rate = 0.9;
+    window.speechSynthesis?.speak(utterance);
+  }
+
+  private toggleSessionPanel(): void {
+    if (this.sessionPanelEl) {
+      this.hideSessionPanel();
+      return;
+    }
+    const panel = document.createElement("div");
+    panel.className = "session-panel";
+    const title = document.createElement("p");
+    title.className = "panel-title";
+    title.textContent = `Mots de cette session (${this.sessionWords.length})`;
+    panel.appendChild(title);
+
+    if (this.sessionWords.length === 0) {
+      const empty = document.createElement("p");
+      empty.style.cssText = "font-size:12px;color:#a1a1aa;margin:4px;";
+      empty.textContent = "Aucun mot pour l'instant \u2014 laisse la vid\u00e9o tourner.";
+      panel.appendChild(empty);
+    }
+
+    for (const cue of [...this.sessionWords].reverse()) {
+      const row = document.createElement("div");
+      row.className = "session-row";
+      const w = document.createElement("span");
+      w.className = "w";
+      w.textContent = cue.word;
+      const t = document.createElement("span");
+      t.className = "t";
+      t.textContent = `\u2014 ${cue.translation}`;
+      const speak = document.createElement("button");
+      speak.className = "speak";
+      speak.textContent = "\ud83d\udd0a";
+      speak.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.speakWord(cue.word);
+      });
+      row.append(w, t, speak);
+      row.addEventListener("click", () => this.onWordExpand?.(cue));
+      panel.appendChild(row);
+    }
+
+    this.sessionPanelEl = panel;
+    this.root.appendChild(panel);
+  }
+
+  private hideSessionPanel(): void {
+    this.sessionPanelEl?.remove();
+    this.sessionPanelEl = null;
+  }
+
+  /** End-of-video recap: every word encountered, clickable chips, per spec's "after the video" moment. */
+  showRecap(): void {
+    if (this.sessionWords.length === 0) return;
+    const { backdrop, modal } = this.buildModalShell();
+
+    const title = document.createElement("h2");
+    title.textContent = `\ud83c\udfac Vid\u00e9o termin\u00e9e \u2014 ${this.sessionWords.length} mot${this.sessionWords.length > 1 ? "s" : ""} rencontr\u00e9${this.sessionWords.length > 1 ? "s" : ""}`;
+    modal.appendChild(title);
+
+    const intro = document.createElement("p");
+    intro.style.color = "#a1a1aa";
+    intro.textContent = "Ils sont d\u00e9j\u00e0 dans ta banque de vocabulaire. Clique un mot pour le revoir, ou r\u00e9vise-les en flashcards sur le site.";
+    modal.appendChild(intro);
+
+    const cloud = document.createElement("div");
+    cloud.style.margin = "12px 0";
+    for (const cue of this.sessionWords) {
+      const chip = document.createElement("button");
+      chip.className = "recap-word";
+      chip.textContent = cue.word;
+      chip.title = cue.translation;
+      chip.addEventListener("click", () => this.onWordExpand?.(cue));
+      cloud.appendChild(chip);
+    }
+    modal.appendChild(cloud);
+
+    const closeRow = document.createElement("div");
+    closeRow.className = "close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "sl-btn";
+    closeBtn.textContent = "Fermer";
+    closeBtn.addEventListener("click", () => this.closeModal());
+    closeRow.appendChild(closeBtn);
+    modal.appendChild(closeRow);
+
+    this.mountModal(backdrop);
   }
 
   setPosition(position: OverlayPosition): void {
@@ -208,6 +466,12 @@ export class Overlay {
   }
 
   showCue(cue: KeywordCue, onExpand: (cue: KeywordCue) => void): void {
+    if (!this.sessionWords.some((w) => w.lemma === cue.lemma)) {
+      this.sessionWords.push(cue);
+      const n = this.sessionWords.length;
+      this.counterBtn.textContent = `${n} mot${n > 1 ? "s" : ""}`;
+    }
+    if (!this.enabled) return;
     const card = document.createElement("div");
     card.className = "card";
 
@@ -257,13 +521,7 @@ export class Overlay {
     speakBtn.className = "sl-btn secondary";
     speakBtn.textContent = "🔊";
     speakBtn.title = "Écouter la prononciation";
-    speakBtn.addEventListener("click", () => {
-      window.speechSynthesis?.cancel();
-      const utterance = new SpeechSynthesisUtterance(cue.word);
-      utterance.lang = this.language ?? "en";
-      utterance.rate = 0.9;
-      window.speechSynthesis?.speak(utterance);
-    });
+    speakBtn.addEventListener("click", () => this.speakWord(cue.word));
     titleRow.appendChild(speakBtn);
     modal.appendChild(titleRow);
 
@@ -480,6 +738,14 @@ export class Overlay {
   closeModal(): void {
     this.modalBackdrop?.remove();
     this.modalBackdrop = null;
+    const cb = this.onModalClose;
+    this.onModalClose = null;
+    cb?.();
+  }
+
+  /** Invoked once when the currently-open modal closes (any path: button, backdrop). */
+  setModalCloseListener(cb: () => void): void {
+    this.onModalClose = cb;
   }
 
   private buildModalShell(): { backdrop: HTMLDivElement; modal: HTMLDivElement } {

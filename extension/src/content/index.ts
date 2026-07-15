@@ -18,10 +18,17 @@ let profileCache: UserProfile | null = null;
 // instead of overwriting the session for the video actually on screen.
 let navigationGeneration = 0;
 
+const OVERLAY_POSITIONS: OverlayPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
+
 async function getOverlayPosition(): Promise<OverlayPosition> {
   const stored = await chrome.storage.local.get(STORAGE_KEYS.overlayPosition);
-  const value = stored[STORAGE_KEYS.overlayPosition];
-  return value === "top-left" || value === "top-right" ? value : "top-right";
+  const value = stored[STORAGE_KEYS.overlayPosition] as OverlayPosition;
+  return OVERLAY_POSITIONS.includes(value) ? value : "top-right";
+}
+
+async function shouldPauseOnPopover(): Promise<boolean> {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.pauseOnPopover);
+  return stored[STORAGE_KEYS.pauseOnPopover] === true;
 }
 
 function ensureOverlay(position: OverlayPosition): Overlay {
@@ -94,8 +101,24 @@ async function postSegment(currentSession: VideoSession, index: number): Promise
 function onCueExpand(currentSession: VideoSession, segmentIndex: number, cue: KeywordCue): void {
   const posted = currentSession.postedByIndex.get(segmentIndex);
   if (!posted || !overlay) return;
-  overlay.showCuePopover(cue, () => {
-    void handleReplay(posted.backend.id);
+  openCuePopover(cue, () => void handleReplay(posted.backend.id));
+}
+
+/**
+ * Opens the word popover, optionally auto-pausing the video while it's open
+ * (opt-in setting — the default never touches playback, per the product's
+ * "immersion never force-broken" principle).
+ */
+function openCuePopover(cue: KeywordCue, onReplay?: () => void): void {
+  if (!overlay) return;
+  void shouldPauseOnPopover().then((pause) => {
+    if (!overlay) return;
+    const video = currentVideoElement;
+    if (pause && video && !video.paused) {
+      video.pause();
+      overlay.setModalCloseListener(() => void video.play().catch(() => {}));
+    }
+    overlay.showCuePopover(cue, onReplay);
   });
 }
 
@@ -216,6 +239,7 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
     return;
   }
   activeOverlay.setLanguage(profile.targetLanguage);
+  activeOverlay.setWordExpandHandler((cue) => openCuePopover(cue));
 
   const video = await waitForVideoElement();
   if (isStale() || !video) return;
@@ -266,6 +290,10 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
 
   video.addEventListener("timeupdate", () => {
     if (session === newSession) onTimeUpdate(newSession, video);
+  });
+
+  video.addEventListener("ended", () => {
+    if (session === newSession) overlay?.showRecap();
   });
 
   void postSegment(newSession, 0);

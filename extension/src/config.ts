@@ -22,4 +22,5 @@ export const CONNECT_EXTENSION_PATH = "/connect-extension";
 export const STORAGE_KEYS = {
   authToken: "streamlingo_auth_token",
   overlayPosition: "streamlingo_overlay_position",
+  pauseOnPopover: "streamlingo_pause_on_popover",
 } as const;
