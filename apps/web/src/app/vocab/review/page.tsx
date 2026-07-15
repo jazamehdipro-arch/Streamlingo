@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { ReviewQuality, SrsState, VocabItem } from "@streamlingo/shared";
+import type { ReviewQuality, SrsState, UserProfile, VocabItem } from "@streamlingo/shared";
+import { speak } from "@/lib/tts";
 
 type VocabWithSrs = VocabItem & { srs: SrsState };
 
@@ -15,6 +16,7 @@ const QUALITY_BUTTONS: { label: string; quality: ReviewQuality; className: strin
 
 export default function VocabReviewPage() {
   const [queue, setQueue] = useState<VocabWithSrs[] | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [position, setPosition] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +30,14 @@ export default function VocabReviewPage() {
       })
       .then((body: { items: VocabWithSrs[] }) => setQueue(body.items))
       .catch((err) => setError(err instanceof Error ? err.message : "Impossible de charger la file de révision"));
+    fetch("/api/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: UserProfile | null) => setProfile(data))
+      .catch(() => {});
   }, []);
 
   const current = queue?.[position] ?? null;
+  const done = queue !== null && queue.length > 0 && position >= queue.length;
 
   async function review(quality: ReviewQuality) {
     if (!current) return;
@@ -59,33 +66,54 @@ export default function VocabReviewPage() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-
       {queue === null && !error && <p className="text-sm text-neutral-500">Chargement…</p>}
 
       {queue && queue.length === 0 && (
-        <p className="text-sm text-neutral-500">Rien à réviser pour le moment — beau travail.</p>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-4xl">🎉</span>
+          <p className="text-sm text-neutral-500">Rien à réviser pour le moment — beau travail.</p>
+        </div>
       )}
 
       {queue && current && (
-        <div className="flex w-full flex-col gap-6">
+        <div className="flex w-full flex-col gap-5">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+            <div
+              className="h-full rounded-full bg-neutral-900 transition-all duration-300"
+              style={{ width: `${(position / queue.length) * 100}%` }}
+            />
+          </div>
           <p className="text-xs uppercase tracking-wide text-neutral-400">
             {position + 1} / {queue.length}
           </p>
 
-          <div
-            className="flex min-h-48 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-neutral-200 p-8 shadow-sm"
-            onClick={() => setRevealed(true)}
-          >
-            <p className="text-2xl font-semibold">{current.lemma}</p>
-            {revealed && (
-              <div className="flex flex-col gap-2">
-                <p className="text-neutral-600">{current.translation}</p>
-                {current.phonetic && <p className="text-sm italic text-neutral-400">/{current.phonetic}/</p>}
-                <p className="text-sm text-neutral-500">{current.exampleSentence}</p>
-                <p className="text-xs text-neutral-400">{current.exampleTranslation}</p>
+          <div className="flip-scene">
+            <div
+              className={`flip-card ${revealed ? "is-flipped" : ""}`}
+              onClick={() => setRevealed(true)}
+            >
+              <div className="flip-face flex min-h-56 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-neutral-200 p-8 shadow-sm">
+                <p className="text-3xl font-semibold">{current.lemma}</p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    speak(current.lemma, profile?.targetLanguage ?? "en");
+                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 transition hover:border-neutral-900"
+                  title="Écouter"
+                >
+                  🔊
+                </button>
+                <p className="text-xs text-neutral-400">Touche la carte pour révéler</p>
               </div>
-            )}
-            {!revealed && <p className="text-xs text-neutral-400">Touche pour révéler</p>}
+              <div className="flip-face flip-back flex min-h-56 flex-col items-center justify-center gap-3 rounded-2xl border border-neutral-900 bg-neutral-900 p-8 text-white shadow-md">
+                <p className="text-2xl font-semibold">{current.translation}</p>
+                {current.phonetic && <p className="text-sm italic text-neutral-400">/{current.phonetic}/</p>}
+                <p className="text-sm text-neutral-300">{current.exampleSentence}</p>
+                <p className="text-xs text-neutral-500">{current.exampleTranslation}</p>
+              </div>
+            </div>
           </div>
 
           {revealed && (
@@ -96,7 +124,7 @@ export default function VocabReviewPage() {
                   type="button"
                   disabled={submitting}
                   onClick={() => review(btn.quality)}
-                  className={`rounded-md border py-2 text-sm font-medium disabled:opacity-50 ${btn.className}`}
+                  className={`rounded-xl border py-2.5 text-sm font-medium transition disabled:opacity-50 ${btn.className}`}
                 >
                   {btn.label}
                 </button>
@@ -106,8 +134,20 @@ export default function VocabReviewPage() {
         </div>
       )}
 
-      {queue && !current && queue.length > 0 && (
-        <p className="text-sm text-neutral-500">Révision terminée pour aujourd’hui.</p>
+      {done && (
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-4xl">🏆</span>
+          <p className="text-sm text-neutral-500">
+            Session terminée — {queue?.length} mot{(queue?.length ?? 0) > 1 ? "s" : ""} révisé
+            {(queue?.length ?? 0) > 1 ? "s" : ""}.
+          </p>
+          <Link
+            href="/vocab"
+            className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white transition hover:bg-neutral-700"
+          >
+            Retour au vocabulaire
+          </Link>
+        </div>
       )}
     </main>
   );

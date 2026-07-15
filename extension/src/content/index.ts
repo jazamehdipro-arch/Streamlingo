@@ -215,6 +215,7 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
     activeOverlay.showNotice("StreamLingo : terminez l'inscription sur l'application web pour activer l'overlay.");
     return;
   }
+  activeOverlay.setLanguage(profile.targetLanguage);
 
   const video = await waitForVideoElement();
   if (isStale() || !video) return;

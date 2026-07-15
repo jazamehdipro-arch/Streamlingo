@@ -26,20 +26,26 @@ const STYLES = `
 
   .card {
     pointer-events: auto;
-    background: rgba(20, 20, 24, 0.92);
+    background: rgba(16, 16, 20, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     color: #f4f4f5;
-    border-radius: 10px;
-    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 3px solid #818cf8;
+    border-radius: 12px;
+    padding: 9px 13px;
     font-size: 13px;
-    line-height: 1.4;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    line-height: 1.45;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
     opacity: 0;
-    transform: translateY(-4px);
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    transform: translateY(-6px) scale(0.98);
+    transition: opacity 0.3s cubic-bezier(0.2, 0.7, 0.3, 1), transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1);
     cursor: pointer;
   }
-  .card.visible { opacity: 1; transform: translateY(0); }
-  .card .word { font-weight: 600; }
+  .card:hover { border-left-color: #c7d2fe; background: rgba(28, 28, 34, 0.9); }
+  .card.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .card .word { font-weight: 700; letter-spacing: 0.01em; }
+  .card .translation { color: #c7d2fe; }
   .card .badge {
     display: inline-block;
     margin-left: 6px;
@@ -53,23 +59,30 @@ const STYLES = `
 
   .notice {
     pointer-events: auto;
-    background: rgba(20, 20, 24, 0.85);
+    background: rgba(16, 16, 20, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.08);
     color: #d4d4d8;
-    border-radius: 8px;
-    padding: 6px 10px;
+    border-radius: 10px;
+    padding: 7px 11px;
     font-size: 12px;
   }
 
   .prompt {
     pointer-events: auto;
-    background: rgba(20, 20, 24, 0.92);
+    background: rgba(16, 16, 20, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.08);
     color: #f4f4f5;
-    border-radius: 10px;
-    padding: 10px 12px;
+    border-radius: 12px;
+    padding: 11px 13px;
     font-size: 13px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 7px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
   }
   .prompt .actions { display: flex; gap: 8px; }
   button.sl-btn {
@@ -155,6 +168,7 @@ export class Overlay {
   private promptEl: HTMLDivElement | null = null;
   private clozePanelEl: HTMLDivElement | null = null;
   private modalBackdrop: HTMLDivElement | null = null;
+  private language: string | null = null;
 
   constructor(position: OverlayPosition) {
     this.host = document.createElement("div");
@@ -174,6 +188,11 @@ export class Overlay {
 
   setPosition(position: OverlayPosition): void {
     this.root.className = `root pos-${position}`;
+  }
+
+  /** BCP-47 code of the learner's target language, used for pronunciation TTS. */
+  setLanguage(lang: string): void {
+    this.language = lang;
   }
 
   showNotice(text: string, timeoutMs = 6000): void {
@@ -198,6 +217,7 @@ export class Overlay {
     card.appendChild(wordEl);
 
     const translationEl = document.createElement("span");
+    translationEl.className = "translation";
     translationEl.textContent = ` — ${cue.translation}`;
     card.appendChild(translationEl);
 
@@ -210,6 +230,11 @@ export class Overlay {
 
     card.addEventListener("click", () => onExpand(cue));
 
+    const existing = Array.from(this.root.querySelectorAll(".card"));
+    for (const old of existing.slice(0, Math.max(0, existing.length - 3))) {
+      old.classList.remove("visible");
+      window.setTimeout(() => old.remove(), 300);
+    }
     this.root.appendChild(card);
     requestAnimationFrame(() => card.classList.add("visible"));
 
@@ -222,9 +247,25 @@ export class Overlay {
   showCuePopover(cue: KeywordCue, onReplay?: () => void): void {
     const { backdrop, modal } = this.buildModalShell();
 
+    const titleRow = document.createElement("div");
+    titleRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:12px;";
     const title = document.createElement("h2");
+    title.style.margin = "0";
     title.textContent = `${cue.word} — ${cue.translation}`;
-    modal.appendChild(title);
+    titleRow.appendChild(title);
+    const speakBtn = document.createElement("button");
+    speakBtn.className = "sl-btn secondary";
+    speakBtn.textContent = "🔊";
+    speakBtn.title = "Écouter la prononciation";
+    speakBtn.addEventListener("click", () => {
+      window.speechSynthesis?.cancel();
+      const utterance = new SpeechSynthesisUtterance(cue.word);
+      utterance.lang = this.language ?? "en";
+      utterance.rate = 0.9;
+      window.speechSynthesis?.speak(utterance);
+    });
+    titleRow.appendChild(speakBtn);
+    modal.appendChild(titleRow);
 
     if (cue.phonetic) {
       const phon = document.createElement("p");
