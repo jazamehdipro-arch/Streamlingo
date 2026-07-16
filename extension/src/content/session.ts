@@ -1,5 +1,5 @@
 import type { ContentSource, KeywordCue, Segment, UserProfile } from "@streamlingo/shared";
-import type { LocalSegment } from "./segmenter";
+import type { LocalSegment } from "@streamlingo/shared";
 
 export interface PostedSegment {
   local: LocalSegment;

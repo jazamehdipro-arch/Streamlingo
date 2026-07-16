@@ -7,6 +7,15 @@ export const metadata: Metadata = {
   title: "StreamLingo — apprends une langue avec de vraies vidéos",
   description:
     "Transforme n'importe quelle vidéo YouTube ou podcast en session d'apprentissage de langue, sans casser l'immersion.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "StreamLingo", statusBarStyle: "black-translucent" },
+  icons: { apple: "/icons/icon-180.png" },
+};
+
+export const viewport = {
+  themeColor: "#101014",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

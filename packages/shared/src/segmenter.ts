@@ -1,4 +1,4 @@
-import type { CaptionCue } from "./youtubeCaptions";
+import type { TranscriptCue } from "./types";
 
 const TARGET_SEGMENT_SECONDS = 45;
 const MIN_SEGMENT_SECONDS = 30;
@@ -11,7 +11,7 @@ export interface LocalSegment {
   transcript: string;
   /** Original cues with real timestamps, forwarded to the backend so keyword
    * timing can be anchored to actual caption times (docs/RISKS.md §2). */
-  cues: CaptionCue[];
+  cues: TranscriptCue[];
 }
 
 /**
@@ -20,13 +20,13 @@ export interface LocalSegment {
  * mid-cue): splitting a caption line in half would hand the backend a
  * transcript fragment with no coherent sentence to extract keywords from.
  */
-export function sliceIntoSegments(cues: CaptionCue[]): LocalSegment[] {
+export function sliceIntoSegments(cues: TranscriptCue[]): LocalSegment[] {
   if (cues.length === 0) return [];
 
   const sorted = [...cues].sort((a, b) => a.startSeconds - b.startSeconds);
   const segments: LocalSegment[] = [];
 
-  let bucket: CaptionCue[] = [];
+  let bucket: TranscriptCue[] = [];
   let bucketStart = sorted[0]?.startSeconds ?? 0;
 
   const flush = () => {

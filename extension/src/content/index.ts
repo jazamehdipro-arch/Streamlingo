@@ -3,7 +3,7 @@ import * as api from "../lib/api";
 import { STORAGE_KEYS } from "../config";
 import { Overlay, type OverlayPosition } from "./overlay";
 import { fetchCaptionCues } from "./youtubeCaptions";
-import { findSegmentIndexForTime, sliceIntoSegments } from "./segmenter";
+import { findSegmentIndexForTime, sliceIntoSegments } from "@streamlingo/shared";
 import { cueKey, VideoSession } from "./session";
 import { getVideoIdFromUrl, hideNativeCaptions, showNativeCaptions, waitForVideoElement } from "./youtubeDom";
 
