@@ -60,6 +60,52 @@ export async function POST(
 
   const { index, startSeconds, endSeconds, transcript, cues } = parsed.data;
 
+  // Levier 1 des économies de tokens : un segment déjà analysé avec le même
+  // transcript est servi depuis la base — re-visionnages et préchargements
+  // répétés ne re-paient jamais le LLM.
+  const { data: cachedSegment } = await supabase
+    .from("segments")
+    .select("*")
+    .eq("source_id", sourceId)
+    .eq("index", index)
+    .maybeSingle<SegmentRow>();
+
+  if (cachedSegment && cachedSegment.transcript === transcript) {
+    const { data: cachedCueRows } = await supabase
+      .from("keyword_cues")
+      .select("*")
+      .eq("segment_id", cachedSegment.id)
+      .order("start_seconds");
+
+    if (cachedCueRows && cachedCueRows.length > 0) {
+      let cachedCues: KeywordCue[] = cachedCueRows.map((row) => ({
+        word: row.word as string,
+        lemma: row.lemma as string,
+        translation: row.translation as string,
+        exampleSentence: (row.example_sentence as string) ?? "",
+        exampleTranslation: (row.example_translation as string) ?? "",
+        phonetic: (row.phonetic as string | null) ?? null,
+        startSeconds: Number(row.start_seconds),
+        frequencyRank: row.frequency_rank as KeywordCue["frequencyRank"],
+      }));
+
+      // Les mots marqués connus depuis la première analyse restent exclus,
+      // et un mot déjà en banque est un "déjà vu" par définition sur un
+      // passage revisité.
+      const { data: vocabRows } = await supabase
+        .from("vocab_items")
+        .select("lemma, known")
+        .eq("user_id", userId)
+        .in("lemma", cachedCues.map((c) => c.lemma));
+      const known = new Set((vocabRows ?? []).filter((r) => r.known === true).map((r) => r.lemma as string));
+      const banked = new Set((vocabRows ?? []).map((r) => r.lemma as string));
+      cachedCues = cachedCues.filter((c) => !known.has(c.lemma));
+      for (const c of cachedCues) c.previouslyEncountered = banked.has(c.lemma);
+
+      return NextResponse.json({ segment: mapSegment(cachedSegment), keywordCues: cachedCues, cached: true });
+    }
+  }
+
   const { data: segmentRow, error: segmentError } = await supabase
     .from("segments")
     .upsert(
@@ -92,7 +138,12 @@ export async function POST(
     console.error("extractKeywords failed:", message);
     return serverError(`LLM keyword extraction failed: ${message}`);
   }
-  const timedCues = estimateWordTimings(transcript, startSeconds, endSeconds, rawKeywords, cues);
+  const keywordsWithEmptyExamples = rawKeywords.map((k) => ({
+    ...k,
+    exampleSentence: "",
+    exampleTranslation: "",
+  }));
+  const timedCues = estimateWordTimings(transcript, startSeconds, endSeconds, keywordsWithEmptyExamples, cues);
   let filteredCues = filterKeywordsForLevel(timedCues, profile.level);
 
   // Drop words the user marked as known — they must never resurface in the

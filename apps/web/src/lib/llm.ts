@@ -25,14 +25,20 @@ const frequencyRankSchema = z.union([
   z.literal(4),
 ]);
 
+// No examples at extraction time: they dominate output-token cost and only
+// 1-2 words in 20 ever get their card opened. /api/vocab/example generates
+// them lazily on first open (levier 2 des économies de tokens).
 const keywordSchema = z.object({
   word: z.string().min(1),
   lemma: z.string().min(1),
   translation: z.string().min(1),
-  exampleSentence: z.string().min(1),
-  exampleTranslation: z.string().min(1),
   phonetic: z.string().nullable(),
   frequencyRank: frequencyRankSchema,
+});
+
+const exampleResponseSchema = z.object({
+  exampleSentence: z.string().min(1),
+  exampleTranslation: z.string().min(1),
 });
 
 const extractKeywordsResponseSchema = z.object({
@@ -143,12 +149,30 @@ function extractJsonObject(text: string): string {
   return candidate.slice(start, end + 1);
 }
 
+export async function generateExample(
+  word: string,
+  translation: string,
+  targetLang: string,
+  nativeLang: string
+): Promise<{ exampleSentence: string; exampleTranslation: string }> {
+  const system =
+    "You write one short example sentence for a language learner's vocabulary card. You always " +
+    "reply with a single JSON object and nothing else — no prose, no markdown fences.";
+  const prompt = `Word: "${word}" (in ${targetLang}), meaning "${translation}" (in ${nativeLang}).
+
+Write one short, natural example sentence in ${targetLang} using the word in that sense, and its
+translation into ${nativeLang}.
+
+Reply with JSON: { "exampleSentence": "...", "exampleTranslation": "..." }`;
+  return requestJson(system, prompt, exampleResponseSchema, FAST_MODEL_ID);
+}
+
 export async function extractKeywords(
   transcript: string,
   level: CefrLevel,
   targetLang: string,
   nativeLang: string
-): Promise<Array<Omit<KeywordCue, "startSeconds">>> {
+): Promise<Array<Omit<KeywordCue, "startSeconds" | "exampleSentence" | "exampleTranslation">>> {
   const system =
     "You are a language-learning content pipeline. You extract vocabulary from a transcript and " +
     "translate it for a learner. You always reply with a single JSON object and nothing else — no " +
@@ -177,8 +201,6 @@ For each one, return:
 - "lemma": its dictionary form
 - "translation": translation into ${nativeLang}, matching the sense used in THIS transcript
   (not the most common sense of the word in general)
-- "exampleSentence": a short new example sentence in ${targetLang} using the word in the same sense
-- "exampleTranslation": that example sentence translated into ${nativeLang}
 - "phonetic": a simple phonetic/pronunciation hint in ${nativeLang}-friendly notation, or null if not useful
 - "frequencyRank": an integer 0-4 rating rarity/difficulty, anchored to CEFR:
   0 = A1 core vocabulary, 1 = A2, 2 = B1, 3 = B2, 4 = C1+/rare/idiomatic

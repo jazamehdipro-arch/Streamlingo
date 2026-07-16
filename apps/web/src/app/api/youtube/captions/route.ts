@@ -2,18 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { TranscriptCue } from "@streamlingo/shared";
 import { getUserId } from "@/lib/auth";
-import { badRequest, serverError, unauthorized } from "@/lib/http";
+import { badRequest, unauthorized } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 /**
  * Server-side YouTube caption fetch for the no-extension watch mode
- * (mobile). Uses the InnerTube player API with the ANDROID client — the
- * same fallback that proved reliable in the extension against pot-token
- * gating. Server IPs are more likely to be challenged by YouTube than a
- * real browser, so every failure returns a structured reason the client
- * can surface honestly instead of a generic error.
+ * (mobile). YouTube challenges datacenter IPs far more than browsers, and
+ * which InnerTube client identity gets through varies over time — so this
+ * tries several (ANDROID, IOS, WEB), each with its matching User-Agent,
+ * and reports per-client playability status in errors so field failures
+ * are diagnosable from the response alone.
  */
 
 const bodySchema = z.object({
@@ -27,12 +27,78 @@ interface CaptionTrack {
   kind?: string;
 }
 
+interface PlayerResponse {
+  playabilityStatus?: { status?: string; reason?: string };
+  captions?: { playerCaptionsTracklistRenderer?: { captionTracks?: CaptionTrack[] } };
+}
+
 interface TimedTextJson3 {
   events?: Array<{
     tStartMs?: number;
     dDurationMs?: number;
     segs?: Array<{ utf8?: string }>;
   }>;
+}
+
+const CLIENTS = [
+  {
+    label: "ANDROID",
+    userAgent: "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip",
+    context: { clientName: "ANDROID", clientVersion: "20.10.38", androidSdkVersion: 30, hl: "en" },
+  },
+  {
+    label: "IOS",
+    userAgent: "com.google.ios.youtube/20.10.38 (iPhone16,2; U; CPU iOS 17_5 like Mac OS X)",
+    context: { clientName: "IOS", clientVersion: "20.10.38", deviceModel: "iPhone16,2", hl: "en" },
+  },
+  {
+    label: "WEB",
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    context: { clientName: "WEB", clientVersion: "2.20250110.00.00", hl: "en" },
+  },
+] as const;
+
+async function fetchPlayerResponse(
+  videoId: string,
+  client: (typeof CLIENTS)[number]
+): Promise<{ tracks: CaptionTrack[]; status: string }> {
+  try {
+    const response = await fetch("https://www.youtube.com/youtubei/v1/player", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "user-agent": client.userAgent,
+      },
+      body: JSON.stringify({ context: { client: client.context }, videoId }),
+    });
+    if (!response.ok) return { tracks: [], status: `http_${response.status}` };
+    const data = (await response.json()) as PlayerResponse;
+    const tracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+    const status = data.playabilityStatus?.status ?? "UNKNOWN";
+    return { tracks, status: tracks.length > 0 ? `${status}(${tracks.length} tracks)` : status };
+  } catch (err) {
+    return { tracks: [], status: `error:${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+function parseJson3(body: string): TranscriptCue[] {
+  const cues: TranscriptCue[] = [];
+  for (const event of (JSON.parse(body) as TimedTextJson3).events ?? []) {
+    if (event.tStartMs === undefined || !event.segs) continue;
+    const text = event.segs
+      .map((seg) => seg.utf8 ?? "")
+      .join("")
+      .replace(/\n/g, " ")
+      .trim();
+    if (!text) continue;
+    cues.push({
+      text,
+      startSeconds: event.tStartMs / 1000,
+      durSeconds: (event.dDurationMs ?? 2000) / 1000,
+    });
+  }
+  return cues;
 }
 
 export async function POST(req: NextRequest) {
@@ -43,89 +109,54 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return badRequest(parsed.error.message);
   const { videoId, language } = parsed.data;
 
-  let playerData: unknown;
-  try {
-    const response = await fetch("https://www.youtube.com/youtubei/v1/player", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        context: {
-          client: {
-            clientName: "ANDROID",
-            clientVersion: "20.10.38",
-            androidSdkVersion: 30,
-            hl: "en",
-          },
-        },
-        videoId,
-      }),
-    });
-    if (!response.ok) {
-      return serverError(`YouTube player API: HTTP ${response.status}`);
-    }
-    playerData = await response.json();
-  } catch (err) {
-    return serverError(`YouTube unreachable from server: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  const statuses: Record<string, string> = {};
 
-  const tracks: CaptionTrack[] =
-    (playerData as { captions?: { playerCaptionsTracklistRenderer?: { captionTracks?: CaptionTrack[] } } })
-      .captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  for (const client of CLIENTS) {
+    const { tracks, status } = await fetchPlayerResponse(videoId, client);
+    statuses[client.label] = status;
+    if (tracks.length === 0) continue;
 
-  if (tracks.length === 0) {
-    return NextResponse.json(
-      { error: "Cette vidéo n'a pas de sous-titres.", reason: "no_tracks" },
-      { status: 404 }
-    );
-  }
+    const track =
+      tracks.find((t) => t.languageCode === language) ??
+      tracks.find((t) => t.languageCode.startsWith(language)) ??
+      tracks[0];
 
-  const track =
-    tracks.find((t) => t.languageCode === language) ??
-    tracks.find((t) => t.languageCode.startsWith(language)) ??
-    tracks[0];
-
-  try {
-    const url = new URL(track.baseUrl);
-    url.searchParams.set("fmt", "json3");
-    const response = await fetch(url.toString());
-    const body = await response.text();
-    if (!response.ok || body.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Sous-titres bloqués par YouTube côté serveur.",
-          reason: "gated",
-          status: response.status,
-          bytes: body.length,
-        },
-        { status: 502 }
-      );
-    }
-
-    const cues: TranscriptCue[] = [];
-    for (const event of (JSON.parse(body) as TimedTextJson3).events ?? []) {
-      if (event.tStartMs === undefined || !event.segs) continue;
-      const text = event.segs
-        .map((seg) => seg.utf8 ?? "")
-        .join("")
-        .replace(/\n/g, " ")
-        .trim();
-      if (!text) continue;
-      cues.push({
-        text,
-        startSeconds: event.tStartMs / 1000,
-        durSeconds: (event.dDurationMs ?? 2000) / 1000,
+    try {
+      const url = new URL(track.baseUrl);
+      url.searchParams.set("fmt", "json3");
+      const response = await fetch(url.toString(), {
+        headers: { "user-agent": client.userAgent },
       });
+      const body = await response.text();
+      if (!response.ok || body.length === 0) {
+        statuses[client.label] += ` timedtext:${response.status}/${body.length}b`;
+        continue;
+      }
+      const cues = parseJson3(body);
+      if (cues.length === 0) {
+        statuses[client.label] += " timedtext:empty";
+        continue;
+      }
+      return NextResponse.json({
+        cues,
+        languageCode: track.languageCode,
+        kind: track.kind ?? "manual",
+        client: client.label,
+      });
+    } catch (err) {
+      statuses[client.label] += ` timedtext-error:${err instanceof Error ? err.message : String(err)}`;
     }
-
-    if (cues.length === 0) {
-      return NextResponse.json(
-        { error: "Piste de sous-titres vide.", reason: "empty" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ cues, languageCode: track.languageCode, kind: track.kind ?? "manual" });
-  } catch (err) {
-    return serverError(`Caption fetch failed: ${err instanceof Error ? err.message : String(err)}`);
   }
+
+  const anyBotWall = Object.values(statuses).some((s) => /LOGIN_REQUIRED|UNPLAYABLE|http_4/.test(s));
+  return NextResponse.json(
+    {
+      error: anyBotWall
+        ? "YouTube bloque la récupération des sous-titres depuis le serveur pour cette vidéo."
+        : "Aucun sous-titre accessible pour cette vidéo.",
+      reason: anyBotWall ? "gated" : "no_tracks",
+      statuses,
+    },
+    { status: 502 }
+  );
 }

@@ -275,6 +275,9 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   }
   activeOverlay.setLanguage(profile.targetLanguage);
   activeOverlay.setWordExpandHandler((cue) => openCuePopover(cue));
+  activeOverlay.setExampleGenerator((cue) =>
+    api.generateExample({ lemma: cue.lemma, word: cue.word, translation: cue.translation })
+  );
   activeOverlay.setExplainHandler(() => {
     const active = session;
     const video = currentVideoElement;

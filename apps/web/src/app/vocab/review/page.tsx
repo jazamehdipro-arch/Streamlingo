@@ -37,6 +37,24 @@ export default function VocabReviewPage() {
   }, []);
 
   const current = queue?.[position] ?? null;
+
+  async function ensureExample(item: VocabWithSrs) {
+    if (item.exampleSentence) return;
+    try {
+      const res = await fetch("/api/vocab/example", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lemma: item.lemma, word: item.lemma, translation: item.translation }),
+      });
+      if (!res.ok) return;
+      const example: { exampleSentence: string; exampleTranslation: string } = await res.json();
+      setQueue((prev) =>
+        prev ? prev.map((q) => (q.id === item.id ? { ...q, ...example } : q)) : prev
+      );
+    } catch {
+      // Bonus uniquement.
+    }
+  }
   const done = queue !== null && queue.length > 0 && position >= queue.length;
 
   async function review(quality: ReviewQuality) {
@@ -90,7 +108,10 @@ export default function VocabReviewPage() {
           <div className="flip-scene">
             <div
               className={`flip-card ${revealed ? "is-flipped" : ""}`}
-              onClick={() => setRevealed(true)}
+              onClick={() => {
+                setRevealed(true);
+                if (current) void ensureExample(current);
+              }}
             >
               <div className="flip-face flex min-h-56 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-neutral-200 p-8 shadow-sm">
                 <p className="text-3xl font-semibold">{current.lemma}</p>
@@ -110,8 +131,14 @@ export default function VocabReviewPage() {
               <div className="flip-face flip-back flex min-h-56 flex-col items-center justify-center gap-3 rounded-2xl border border-neutral-900 bg-neutral-900 p-8 text-white shadow-md">
                 <p className="text-2xl font-semibold">{current.translation}</p>
                 {current.phonetic && <p className="text-sm italic text-neutral-400">/{current.phonetic}/</p>}
-                <p className="text-sm text-neutral-300">{current.exampleSentence}</p>
-                <p className="text-xs text-neutral-500">{current.exampleTranslation}</p>
+                {current.exampleSentence ? (
+                  <>
+                    <p className="text-sm text-neutral-300">{current.exampleSentence}</p>
+                    <p className="text-xs text-neutral-500">{current.exampleTranslation}</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-neutral-500">Exemple en cours de génération…</p>
+                )}
               </div>
             </div>
           </div>

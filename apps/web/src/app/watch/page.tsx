@@ -265,6 +265,22 @@ export default function WatchPage() {
     }
   }
 
+  async function loadExample(word: FeedWord) {
+    if (word.exampleSentence) return;
+    try {
+      const res = await fetch("/api/vocab/example", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lemma: word.lemma, word: word.word, translation: word.translation }),
+      });
+      if (!res.ok) return;
+      const example: { exampleSentence: string; exampleTranslation: string } = await res.json();
+      setFeed((prev) => prev.map((w) => (w.lemma === word.lemma ? { ...w, ...example } : w)));
+    } catch {
+      // L'exemple est un bonus — silence en cas d'échec.
+    }
+  }
+
   async function markKnown(cue: KeywordCue) {
     try {
       await fetch("/api/vocab/known", {
@@ -377,7 +393,10 @@ export default function WatchPage() {
                 <li
                   key={word.id}
                   className="rounded-2xl border border-neutral-200 border-l-4 border-l-indigo-400 px-4 py-3 transition"
-                  onClick={() => setExpandedId(expanded ? null : word.id)}
+                  onClick={() => {
+                    setExpandedId(expanded ? null : word.id);
+                    if (!expanded) void loadExample(word);
+                  }}
                 >
                   <div className="flex items-center gap-2">
                     <p className="flex-1 text-[15px]">
@@ -405,8 +424,14 @@ export default function WatchPage() {
                   {expanded && (
                     <div className="mt-3 flex flex-col gap-2 border-t border-neutral-100 pt-3 text-sm">
                       {word.phonetic && <p className="italic text-neutral-400">/{word.phonetic}/</p>}
-                      <p className="text-neutral-700">{word.exampleSentence}</p>
-                      <p className="text-neutral-400">{word.exampleTranslation}</p>
+                      {word.exampleSentence ? (
+                        <>
+                          <p className="text-neutral-700">{word.exampleSentence}</p>
+                          <p className="text-neutral-400">{word.exampleTranslation}</p>
+                        </>
+                      ) : (
+                        <p className="text-neutral-400">Génération de l&apos;exemple…</p>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => {

@@ -315,6 +315,9 @@ export class Overlay {
   private onWordExpand: ((cue: KeywordCue) => void) | null = null;
   private onMarkKnown: ((cue: KeywordCue) => Promise<void>) | null = null;
   private onExplain: (() => void) | null = null;
+  private onGenerateExample:
+    | ((cue: KeywordCue) => Promise<{ exampleSentence: string; exampleTranslation: string }>)
+    | null = null;
   private helpBtn!: HTMLButtonElement;
 
   constructor(position: OverlayPosition, container?: HTMLElement) {
@@ -390,6 +393,13 @@ export class Overlay {
   /** Registered by the content script: the header's "explain what was just said" button. */
   setExplainHandler(handler: () => void): void {
     this.onExplain = handler;
+  }
+
+  /** Registered by the content script: lazy example generation for a word card. */
+  setExampleGenerator(
+    handler: (cue: KeywordCue) => Promise<{ exampleSentence: string; exampleTranslation: string }>
+  ): void {
+    this.onGenerateExample = handler;
   }
 
   /** Explanation modal with a loading state resolved by the caller's promise. */
@@ -702,12 +712,29 @@ export class Overlay {
     }
 
     const example = document.createElement("p");
-    example.textContent = cue.exampleSentence;
-    modal.appendChild(example);
-
     const exampleTranslation = document.createElement("p");
-    exampleTranslation.textContent = cue.exampleTranslation;
     exampleTranslation.style.color = "#a1a1aa";
+    if (cue.exampleSentence) {
+      example.textContent = cue.exampleSentence;
+      exampleTranslation.textContent = cue.exampleTranslation;
+    } else if (this.onGenerateExample) {
+      example.textContent = "Exemple en cours de génération…";
+      example.style.color = "#a1a1aa";
+      this.onGenerateExample(cue)
+        .then(({ exampleSentence, exampleTranslation: tr }) => {
+          // Mutate the cue so re-opening the card is instant and the session
+          // panel/recap paths see the generated example too.
+          cue.exampleSentence = exampleSentence;
+          cue.exampleTranslation = tr;
+          example.textContent = exampleSentence;
+          example.style.color = "";
+          exampleTranslation.textContent = tr;
+        })
+        .catch(() => {
+          example.textContent = "";
+        });
+    }
+    modal.appendChild(example);
     modal.appendChild(exampleTranslation);
 
     const closeRow = document.createElement("div");
