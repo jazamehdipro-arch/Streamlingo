@@ -80,6 +80,16 @@ const STYLES = `
     line-height: 1;
   }
   .header .toggle:hover { color: #f4f4f5; }
+  .header .help {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 2px;
+    line-height: 1;
+    opacity: 0.85;
+  }
+  .header .help:hover { opacity: 1; }
 
   .session-panel {
     pointer-events: auto;
@@ -271,6 +281,19 @@ const STYLES = `
     margin: 0 2px;
   }
   .cloze-blank.revealed { border-bottom-color: #52525b; color: #a1a1aa; }
+  .cloze-close {
+    float: right;
+    background: none;
+    border: none;
+    color: #a1a1aa;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0 4px 8px;
+  }
+  .cloze-close:hover { color: #f4f4f5; }
+  .tricky-row { margin: 6px 0; font-size: 13px; }
+  .tricky-row .phrase { color: #c7d2fe; font-weight: 600; }
 `;
 
 export class Overlay {
@@ -291,6 +314,8 @@ export class Overlay {
   private onModalClose: (() => void) | null = null;
   private onWordExpand: ((cue: KeywordCue) => void) | null = null;
   private onMarkKnown: ((cue: KeywordCue) => Promise<void>) | null = null;
+  private onExplain: (() => void) | null = null;
+  private helpBtn!: HTMLButtonElement;
 
   constructor(position: OverlayPosition, container?: HTMLElement) {
     this.host = document.createElement("div");
@@ -324,6 +349,13 @@ export class Overlay {
     this.counterBtn.addEventListener("click", () => this.toggleSessionPanel());
     this.headerEl.appendChild(this.counterBtn);
 
+    this.helpBtn = document.createElement("button");
+    this.helpBtn.className = "help";
+    this.helpBtn.textContent = "\ud83d\udca1";
+    this.helpBtn.title = "Explique-moi ce qui vient d'\u00eatre dit";
+    this.helpBtn.addEventListener("click", () => this.onExplain?.());
+    this.headerEl.appendChild(this.helpBtn);
+
     this.toggleBtn = document.createElement("button");
     this.toggleBtn.className = "toggle";
     this.toggleBtn.textContent = "\ud83d\udc41";
@@ -353,6 +385,70 @@ export class Overlay {
   /** Registered by the content script: "je connais ce mot" in the popover. */
   setMarkKnownHandler(handler: (cue: KeywordCue) => Promise<void>): void {
     this.onMarkKnown = handler;
+  }
+
+  /** Registered by the content script: the header's "explain what was just said" button. */
+  setExplainHandler(handler: () => void): void {
+    this.onExplain = handler;
+  }
+
+  /** Explanation modal with a loading state resolved by the caller's promise. */
+  showExplainModal(
+    load: Promise<{ summary: string; details: string; tricky: { phrase: string; meaning: string }[] }>
+  ): void {
+    const { backdrop, modal } = this.buildModalShell();
+
+    const title = document.createElement("h2");
+    title.textContent = "\ud83d\udca1 Ce qui vient d'\u00eatre dit";
+    modal.appendChild(title);
+
+    const body = document.createElement("div");
+    const loading = document.createElement("p");
+    loading.style.color = "#a1a1aa";
+    loading.textContent = "Analyse du passage en cours\u2026";
+    body.appendChild(loading);
+    modal.appendChild(body);
+
+    const closeRow = document.createElement("div");
+    closeRow.className = "close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "sl-btn";
+    closeBtn.textContent = "Fermer";
+    closeBtn.addEventListener("click", () => this.closeModal());
+    closeRow.appendChild(closeBtn);
+    modal.appendChild(closeRow);
+
+    this.mountModal(backdrop);
+
+    load
+      .then(({ summary, details, tricky }) => {
+        body.innerHTML = "";
+        const s = document.createElement("p");
+        s.style.fontWeight = "600";
+        s.textContent = summary;
+        body.appendChild(s);
+        const d = document.createElement("p");
+        d.style.color = "#d4d4d8";
+        d.textContent = details;
+        body.appendChild(d);
+        for (const item of tricky) {
+          const row = document.createElement("p");
+          row.className = "tricky-row";
+          const phrase = document.createElement("span");
+          phrase.className = "phrase";
+          phrase.textContent = `\u00ab ${item.phrase} \u00bb`;
+          row.appendChild(phrase);
+          row.appendChild(document.createTextNode(` \u2014 ${item.meaning}`));
+          body.appendChild(row);
+        }
+      })
+      .catch(() => {
+        body.innerHTML = "";
+        const err = document.createElement("p");
+        err.style.color = "#fca5a5";
+        err.textContent = "Explication indisponible pour le moment \u2014 r\u00e9essaie dans quelques secondes.";
+        body.appendChild(err);
+      });
   }
 
   /** Removes every visible trace of a lemma (cards + session list) after it's marked known. */
@@ -707,10 +803,20 @@ export class Overlay {
     this.promptEl = null;
   }
 
-  showClozePanel(item: ClozeItem, onRevealed?: (position: number) => void): void {
+  showClozePanel(item: ClozeItem, onRevealed?: (position: number) => void, onClose?: () => void): void {
     this.hideClozePanel();
     const el = document.createElement("div");
     el.className = "cloze-panel";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "cloze-close";
+    closeBtn.textContent = "\u2715";
+    closeBtn.title = "Fermer les sous-titres \u00e0 trous";
+    closeBtn.addEventListener("click", () => {
+      this.hideClozePanel();
+      onClose?.();
+    });
+    el.appendChild(closeBtn);
 
     const answerByPosition = new Map(item.answers.map((a) => [a.position, a.word]));
     const parts = item.transcriptWithBlanks.split("___");

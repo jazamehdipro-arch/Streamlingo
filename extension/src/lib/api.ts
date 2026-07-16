@@ -105,6 +105,12 @@ export function markKnown(cue: {
   return request<{ known: true; lemma: string }>("POST", "/api/vocab/known", cue);
 }
 
+export function explainRecent(
+  transcript: string
+): Promise<{ summary: string; details: string; tricky: { phrase: string; meaning: string }[] }> {
+  return request("POST", "/api/explain", { transcript });
+}
+
 export function getVocab(): Promise<{ items: Array<{ srs: { dueAt: string } }> }> {
   return request<{ items: Array<{ srs: { dueAt: string } }> }>("GET", "/api/vocab");
 }

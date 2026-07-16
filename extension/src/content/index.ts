@@ -160,7 +160,10 @@ async function handleClozeRequested(currentSession: VideoSession, segmentIndex: 
     const item = await api.getCloze(posted.backend.id);
     hideNativeCaptions();
     currentSession.clozeActiveForIndex = segmentIndex;
-    overlay.showClozePanel(item);
+    overlay.showClozePanel(item, undefined, () => {
+      showNativeCaptions();
+      currentSession.clozeActiveForIndex = null;
+    });
   } catch {
     overlay.showNotice("Sous-titres à trous indisponibles pour ce passage.");
   }
@@ -272,6 +275,33 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   }
   activeOverlay.setLanguage(profile.targetLanguage);
   activeOverlay.setWordExpandHandler((cue) => openCuePopover(cue));
+  activeOverlay.setExplainHandler(() => {
+    const active = session;
+    const video = currentVideoElement;
+    if (!active || !video || !overlay) return;
+    // Last ~15s of caption text around the point of confusion. 10s of ASR is
+    // often just a clause fragment; a little extra context makes the
+    // explanation coherent without drifting from "what was JUST said".
+    const from = Math.max(0, video.currentTime - 15);
+    const recent = active.localSegments
+      .flatMap((seg) => seg.cues)
+      .filter((c) => c.startSeconds >= from && c.startSeconds <= video.currentTime)
+      .map((c) => c.text)
+      .join(" ")
+      .trim();
+    if (!recent) {
+      overlay.showNotice("Rien à expliquer pour l'instant — laisse la vid\u00e9o parler un peu.");
+      return;
+    }
+    void shouldPauseOnPopover().then((pause) => {
+      if (!overlay) return;
+      if (pause && !video.paused) {
+        video.pause();
+        overlay.setModalCloseListener(() => void video.play().catch(() => {}));
+      }
+      overlay.showExplainModal(api.explainRecent(recent));
+    });
+  });
   activeOverlay.setMarkKnownHandler(async (cue) => {
     await api.markKnown({
       lemma: cue.lemma,

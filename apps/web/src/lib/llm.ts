@@ -282,3 +282,42 @@ Reply with JSON: { "transcript": "...", "translation": "..." }`;
 
   return requestJson(system, prompt, replayResponseSchema);
 }
+
+const explainResponseSchema = z.object({
+  summary: z.string().min(1),
+  details: z.string().min(1),
+  tricky: z.array(z.object({ phrase: z.string().min(1), meaning: z.string().min(1) })).max(5),
+});
+
+/**
+ * "Explique-moi ce qui vient d'être dit" — the user is lost mid-video. Not a
+ * translation (replay covers that): a plain-language explanation in the
+ * learner's native language. Stays on Sonnet: comprehension help for a
+ * confused learner is exactly where model quality shows.
+ */
+export async function explainPassage(
+  transcript: string,
+  level: CefrLevel,
+  targetLang: string,
+  nativeLang: string
+): Promise<{ summary: string; details: string; tricky: { phrase: string; meaning: string }[] }> {
+  const system =
+    "You help a confused language learner understand what was just said in a video. You always " +
+    "reply with a single JSON object and nothing else — no prose, no markdown fences.";
+
+  const prompt = `A ${level} learner of ${targetLang} (native ${nativeLang}) just heard this passage
+in a video and did not understand it:
+"""
+${transcript}
+"""
+
+Explain it to them in ${nativeLang}, simply:
+- "summary": one short sentence — what is being said, in essence
+- "details": 2-4 sentences unpacking the point being made, plainly, as if to a friend
+- "tricky": up to 5 expressions from the passage likely to have caused the confusion (idioms,
+  slang, fast constructions), each with its meaning in ${nativeLang}. Empty array if none.
+
+Reply with JSON: { "summary": "...", "details": "...", "tricky": [ { "phrase": "...", "meaning": "..." } ] }`;
+
+  return requestJson(system, prompt, explainResponseSchema);
+}
