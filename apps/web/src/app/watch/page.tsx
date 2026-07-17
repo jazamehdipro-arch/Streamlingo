@@ -97,7 +97,7 @@ export default function WatchPage() {
   async function analyzeSegment(index: number) {
     const st = stateRef.current;
     const segment = st.segments[index];
-    if (!segment || !st.sourceId || st.analyzed.has(index) || st.posting.has(index)) return;
+    if (!segment || !segment.transcript || !st.sourceId || st.analyzed.has(index) || st.posting.has(index)) return;
     st.posting.add(index);
     try {
       const res = await fetch(`/api/sources/${st.sourceId}/segments`, {
@@ -171,8 +171,44 @@ export default function WatchPage() {
     if (!profile) return;
 
     setStarting(true);
-    setStatus("Récupération des sous-titres…");
+    setStatus("Recherche d'une session existante…");
     try {
+      // Plan C face au mur anti-robot de YouTube : une vidéo déjà analysée
+      // (extension sur ordinateur, ou tentative réussie ici) se rejoue
+      // entièrement depuis la base — ni YouTube ni LLM.
+      const sessRes = await fetch("/api/youtube/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: id }),
+      });
+      if (sessRes.ok) {
+        const sess: {
+          found: boolean;
+          sourceId?: string;
+          segments?: { segment: { id: string; index: number; startSeconds: number; endSeconds: number }; keywordCues: KeywordCue[] }[];
+        } = await sessRes.json();
+        if (sess.found && sess.sourceId && sess.segments && sess.segments.length > 0) {
+          const st = stateRef.current;
+          st.sourceId = sess.sourceId;
+          st.segments = sess.segments.map((s) => ({
+            index: s.segment.index,
+            startSeconds: s.segment.startSeconds,
+            endSeconds: s.segment.endSeconds,
+            transcript: "",
+            cues: [],
+          }));
+          st.analyzed = new Map(sess.segments.map((s, i) => [i, { segmentId: s.segment.id, keywordCues: s.keywordCues }]));
+          st.posting = new Set();
+          st.shownKeys = new Set();
+          st.lastSegment = -1;
+          setFeed([]);
+          setVideoId(id);
+          setStatus(null);
+          return;
+        }
+      }
+
+      setStatus("Récupération des sous-titres…");
       const capRes = await fetch("/api/youtube/captions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,7 +216,11 @@ export default function WatchPage() {
       });
       const capBody = await capRes.json();
       if (!capRes.ok) {
-        throw new Error(capBody.error ?? `Sous-titres indisponibles (${capRes.status})`);
+        const hint =
+          capBody.reason === "gated"
+            ? " Astuce : regarde cette vidéo une fois sur ordinateur avec l'extension StreamLingo — elle deviendra ensuite disponible ici, mots et timings inclus."
+            : "";
+        throw new Error((capBody.error ?? `Sous-titres indisponibles (${capRes.status})`) + hint);
       }
 
       const srcRes = await fetch("/api/sources", {
