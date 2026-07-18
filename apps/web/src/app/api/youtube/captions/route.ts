@@ -42,6 +42,23 @@ interface TimedTextJson3 {
 
 const CLIENTS = [
   {
+    label: "EMBEDDED",
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    context: {
+      clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+      clientVersion: "2.0",
+      hl: "en",
+    },
+    thirdParty: { embedUrl: "https://www.youtube.com/" },
+  },
+  {
+    label: "MWEB",
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    context: { clientName: "MWEB", clientVersion: "2.20250110.01.00", hl: "en" },
+  },
+  {
     label: "ANDROID",
     userAgent: "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip",
     context: { clientName: "ANDROID", clientVersion: "20.10.38", androidSdkVersion: 30, hl: "en" },
@@ -59,18 +76,35 @@ const CLIENTS = [
   },
 ] as const;
 
+/**
+ * Optional residential/rotating proxy for every YouTube request — the
+ * definitive answer to the datacenter bot wall. Set CAPTIONS_PROXY_URL
+ * (e.g. http://user:pass@proxy-host:port) in Vercel env and all fetches
+ * below route through it; unset, they go direct.
+ */
+function proxyDispatcher(): object | undefined {
+  const proxyUrl = process.env.CAPTIONS_PROXY_URL;
+  if (!proxyUrl) return undefined;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { ProxyAgent } = require("undici") as typeof import("undici");
+  return { dispatcher: new ProxyAgent(proxyUrl) };
+}
+
 async function fetchPlayerResponse(
   videoId: string,
   client: (typeof CLIENTS)[number]
 ): Promise<{ tracks: CaptionTrack[]; status: string }> {
   try {
+    const context: Record<string, unknown> = { client: client.context };
+    if ("thirdParty" in client && client.thirdParty) context.thirdParty = client.thirdParty;
     const response = await fetch("https://www.youtube.com/youtubei/v1/player", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "user-agent": client.userAgent,
       },
-      body: JSON.stringify({ context: { client: client.context }, videoId }),
+      body: JSON.stringify({ context, videoId }),
+      ...proxyDispatcher(),
     });
     if (!response.ok) return { tracks: [], status: `http_${response.status}` };
     const data = (await response.json()) as PlayerResponse;
@@ -126,6 +160,7 @@ export async function POST(req: NextRequest) {
       url.searchParams.set("fmt", "json3");
       const response = await fetch(url.toString(), {
         headers: { "user-agent": client.userAgent },
+        ...proxyDispatcher(),
       });
       const body = await response.text();
       if (!response.ok || body.length === 0) {
