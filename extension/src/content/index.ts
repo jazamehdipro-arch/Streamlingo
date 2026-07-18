@@ -93,6 +93,11 @@ async function postSegment(currentSession: VideoSession, index: number): Promise
         "StreamLingo : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options).",
         12000
       );
+    } else if (status === 402) {
+      overlay?.showNotice(
+        "StreamLingo : quota gratuit du mois atteint 🎯 — passe en Pro sur le site pour l'illimité (les vidéos déjà analysées restent dispo).",
+        15000
+      );
     } else if (index === 0) {
       overlay?.showNotice(
         `StreamLingo : le serveur n'a pas répondu (${status ?? "réseau"}) — nouvel essai automatique pendant la lecture.`,

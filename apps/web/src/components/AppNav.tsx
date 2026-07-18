@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/vocab", label: "Vocabulaire" },
   { href: "/vocab/review", label: "Réviser" },
   { href: "/connect-extension", label: "Extension" },
+  { href: "/pricing", label: "Pro" },
 ];
 
 export default function AppNav() {

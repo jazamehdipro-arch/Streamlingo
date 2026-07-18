@@ -111,6 +111,12 @@ export default function WatchPage() {
           cues: segment.cues,
         }),
       });
+      if (res.status === 402) {
+        setStatus("Quota gratuit du mois atteint 🎯 — les passages déjà analysés restent disponibles.");
+        setError("Passe en Pro pour l'analyse illimitée → /pricing");
+        st.analyzed.set(index, { segmentId: "", keywordCues: [] });
+        return;
+      }
       if (!res.ok) throw new Error(`analyse (${res.status})`);
       const body: { segment: { id: string }; keywordCues: KeywordCue[] } = await res.json();
       st.analyzed.set(index, { segmentId: body.segment.id, keywordCues: body.keywordCues });

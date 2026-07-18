@@ -7,6 +7,7 @@ import { badRequest, notFound, serverError, unauthorized } from "@/lib/http";
 import { extractKeywords } from "@/lib/llm";
 import { estimateWordTimings } from "@/lib/wordTiming";
 import { recordVocabEncounter, fetchProfile } from "@/lib/db";
+import { getPlanStatus, recordUsage } from "@/lib/billing";
 import { mapSegment, type SegmentRow } from "@/lib/mappers";
 
 export const runtime = "nodejs";
@@ -106,6 +107,25 @@ export async function POST(
     }
   }
 
+  // Quota (après le cache : rejouer un passage déjà analysé reste gratuit).
+  const segmentSeconds = Math.max(0, endSeconds - startSeconds);
+  const planStatus = await getPlanStatus(supabase, userId);
+  if (planStatus.remainingSeconds < segmentSeconds) {
+    return NextResponse.json(
+      {
+        error:
+          planStatus.plan === "free"
+            ? "Quota gratuit du mois atteint (30 min de vidéo analysée). Passe en Pro pour l'illimité."
+            : "Limite d'usage équitable du mois atteinte.",
+        reason: "quota_exceeded",
+        plan: planStatus.plan,
+        analyzedSeconds: planStatus.analyzedSeconds,
+        limitSeconds: planStatus.limitSeconds,
+      },
+      { status: 402 }
+    );
+  }
+
   const { data: segmentRow, error: segmentError } = await supabase
     .from("segments")
     .upsert(
@@ -138,6 +158,7 @@ export async function POST(
     console.error("extractKeywords failed:", message);
     return serverError(`LLM keyword extraction failed: ${message}`);
   }
+  await recordUsage(supabase, userId, segmentSeconds);
   const keywordsWithEmptyExamples = rawKeywords.map((k) => ({
     ...k,
     exampleSentence: "",
