@@ -82,12 +82,20 @@ const CLIENTS = [
  * (e.g. http://user:pass@proxy-host:port) in Vercel env and all fetches
  * below route through it; unset, they go direct.
  */
+let cachedDispatcher: { dispatcher: unknown } | undefined | null = null;
 function proxyDispatcher(): object | undefined {
+  if (cachedDispatcher !== null) return cachedDispatcher ?? undefined;
   const proxyUrl = process.env.CAPTIONS_PROXY_URL;
-  if (!proxyUrl) return undefined;
+  if (!proxyUrl) {
+    cachedDispatcher = undefined;
+    return undefined;
+  }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ProxyAgent } = require("undici") as typeof import("undici");
-  return { dispatcher: new ProxyAgent(proxyUrl) };
+  // Build the agent once per warm instance — one connection pool, reused across
+  // the several InnerTube client attempts and the timedtext fetch per request.
+  cachedDispatcher = { dispatcher: new ProxyAgent(proxyUrl) };
+  return cachedDispatcher;
 }
 
 async function fetchPlayerResponse(
