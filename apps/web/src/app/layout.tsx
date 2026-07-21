@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AuthListener from "@/components/AuthListener";
 import AppNav from "@/components/AppNav";
+import InstallBanner from "@/components/InstallBanner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className="min-h-screen bg-white text-neutral-900 antialiased">
         <AuthListener />
+        <InstallBanner />
         <AppNav />
         {children}
       </body>
