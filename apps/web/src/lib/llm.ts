@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import type { CefrLevel, ClozeItem, KeywordCue, QuizQuestion } from "@streamlingo/shared";
+import { levelProfile, type CefrLevel, type ClozeItem, type KeywordCue, type QuizQuestion } from "@streamlingo/shared";
 
 const MODEL_ID = "claude-sonnet-5";
 // Keyword extraction is on the hot path of overlay sync (a segment's words
@@ -222,15 +222,19 @@ export async function generateQuiz(
     "to a CEFR level. You always reply with a single JSON object and nothing else — no prose, no " +
     "markdown fences.";
 
+  const profile = levelProfile(level);
+  const questionLang = profile.quizLanguage === "native" ? nativeLang : targetLang;
+
   const prompt = `Transcript (in ${targetLang}):
 """
 ${transcript}
 """
 
-Write 2-3 multiple-choice comprehension questions about this passage, calibrated to a ${level}
-learner (question phrasing and choice complexity should match ${level}). Questions and choices
-should be in ${targetLang}; the explanation should be in ${nativeLang} so the learner understands
-the feedback. Each question needs 3-4 choices with exactly one correct answer. Rules:
+Write 2-3 multiple-choice comprehension questions about this passage for a ${level} learner.
+Level-specific style: ${profile.quizStyle}
+Write the questions and choices in ${questionLang}; write the explanation in ${nativeLang} so the
+learner understands the feedback. Each question needs 3-4 choices with exactly one correct answer.
+Rules:
 - Test comprehension of what was said, not trivia recall of exact numbers or side details.
 - Wrong choices must be plausible (same topic, right grammatical form) but clearly wrong to
   someone who understood the passage — never "all of the above" or joke options.
@@ -254,6 +258,14 @@ export async function generateCloze(
   level: CefrLevel,
   targetLang: string
 ): Promise<Omit<ClozeItem, "segmentId">> {
+  const intensity = levelProfile(level).cloze;
+  const densityRule =
+    intensity === "dense"
+      ? "blank many content words, including some harder ones"
+      : intensity === "medium"
+        ? "blank roughly two content words per sentence"
+        : "blank roughly one content word per sentence";
+
   const system =
     "You are a language-learning cloze-exercise generator. You blank out words in a transcript so " +
     "a learner can guess them by ear. You always reply with a single JSON object and nothing else — " +
@@ -267,9 +279,9 @@ ${transcript}
 Produce a cloze version of this transcript for a ${level} learner: replace content words the
 learner should be able to infer or recall — not every word, and not purely function words —
 with the literal placeholder "___" (exactly three underscores), keeping everything else,
-including punctuation, unchanged. Blank roughly one word per sentence for B1, slightly more
-for B2/C1. Every blank must have a matching entry in "answers", in order. "position" is the
-0-indexed order of the blank within the transcript (0 = first blank, 1 = second blank, ...).
+including punctuation, unchanged. Density for this level (${intensity}): ${densityRule}.
+Every blank must have a matching entry in "answers", in order. "position" is the 0-indexed
+order of the blank within the transcript (0 = first blank, 1 = second blank, ...).
 
 Reply with JSON:
 {
@@ -333,7 +345,9 @@ in a video and did not understand it:
 ${transcript}
 """
 
-Explain it to them in ${nativeLang}, simply:
+Level-specific approach: ${levelProfile(level).explanationStyle}
+
+Explain it to them in ${nativeLang}:
 - "summary": one short sentence — what is being said, in essence
 - "details": 2-4 sentences unpacking the point being made, plainly, as if to a friend
 - "tricky": up to 5 expressions from the passage likely to have caused the confusion (idioms,

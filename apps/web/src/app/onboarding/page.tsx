@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CEFR_LEVELS, type CefrLevel } from "@streamlingo/shared";
+import { CEFR_LEVELS, LEVEL_PROFILES, type CefrLevel } from "@streamlingo/shared";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -106,6 +106,15 @@ export default function OnboardingPage() {
                 {l}
               </button>
             ))}
+          </div>
+          <div className="mt-1 rounded-lg bg-neutral-50 px-3 py-2">
+            <p className="font-medium text-neutral-900">{LEVEL_PROFILES[level].persona}</p>
+            <p className="mt-0.5 text-xs text-neutral-500">{LEVEL_PROFILES[level].contentTip}</p>
+            <p className="mt-1 text-xs text-neutral-400">
+              À ce niveau : {level === "A1" || level === "A2" ? "beaucoup" : level === "B1" ? "un bon nombre" : "peu"} de
+              mots traduits{LEVEL_PROFILES[level].cloze === "none" ? "" : ", sous-titres à trous"}, quiz{" "}
+              {LEVEL_PROFILES[level].quizLanguage === "native" ? "en français" : "en langue cible"}.
+            </p>
           </div>
         </fieldset>
 

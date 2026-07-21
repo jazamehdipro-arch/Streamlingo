@@ -134,6 +134,39 @@ function check(label, fn) {
   });
 }
 
+// ---- level profiles (monotonic ladder) ----
+{
+  const { LEVEL_PROFILES } = await bundle("packages/shared/src/levelProfiles.ts", "levelProfiles");
+  const levels = ["A1", "A2", "B1", "B2", "C1"];
+  console.log("levelProfiles:");
+  check("rarity threshold never decreases as level rises", () => {
+    for (let i = 1; i < levels.length; i++) {
+      assert.ok(LEVEL_PROFILES[levels[i]].minFrequencyRank >= LEVEL_PROFILES[levels[i - 1]].minFrequencyRank);
+    }
+  });
+  check("density cap never increases as level rises", () => {
+    for (let i = 1; i < levels.length; i++) {
+      assert.ok(LEVEL_PROFILES[levels[i]].maxPerSegment <= LEVEL_PROFILES[levels[i - 1]].maxPerSegment);
+    }
+  });
+  check("every level has a persona and content tip", () => {
+    for (const l of levels) {
+      assert.ok(LEVEL_PROFILES[l].persona.length > 0 && LEVEL_PROFILES[l].contentTip.length > 0);
+    }
+  });
+  check("A1/A2 quiz in native language, B1+ in target", () => {
+    assert.equal(LEVEL_PROFILES.A1.quizLanguage, "native");
+    assert.equal(LEVEL_PROFILES.A2.quizLanguage, "native");
+    assert.equal(LEVEL_PROFILES.B1.quizLanguage, "target");
+    assert.equal(LEVEL_PROFILES.C1.quizLanguage, "target");
+  });
+  check("cloze only from B1", () => {
+    assert.equal(LEVEL_PROFILES.A1.cloze, "none");
+    assert.equal(LEVEL_PROFILES.A2.cloze, "none");
+    assert.notEqual(LEVEL_PROFILES.B1.cloze, "none");
+  });
+}
+
 await rm(outDir, { recursive: true, force: true });
 
 if (failures > 0) {
