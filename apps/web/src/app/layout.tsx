@@ -16,8 +16,13 @@ export const viewport = {
   themeColor: "#101014",
   width: "device-width",
   initialScale: 1,
-  // Extend under the notch / home indicator so the installed (home-screen) app
-  // renders truly edge-to-edge, including the "Grand écran" video mode.
+  // Lock zoom: in the installed (standalone) app iOS honours this, preventing
+  // accidental pinch / double-tap zoom that left the fullscreen video looking
+  // over-zoomed. Safari tabs ignore it, so browser users keep pinch-to-zoom.
+  maximumScale: 1,
+  userScalable: false,
+  // Extend under the notch / home indicator so the installed app renders truly
+  // edge-to-edge, including the "Grand écran" video mode.
   viewportFit: "cover" as const,
 };
 

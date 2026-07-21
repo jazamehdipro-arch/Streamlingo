@@ -428,7 +428,7 @@ export default function WatchPage() {
           <div
             className={
               cinema
-                ? "fixed inset-0 z-50 flex items-center bg-black"
+                ? "fixed inset-0 z-50 flex items-center justify-center bg-black"
                 : "sticky top-14 z-30 -mx-4 sm:mx-0"
             }
           >
@@ -436,9 +436,12 @@ export default function WatchPage() {
               <div
                 className={
                   cinema
-                    ? "mx-auto aspect-video max-h-[100dvh] w-full"
+                    ? "mx-auto aspect-video"
                     : "aspect-video w-full overflow-hidden bg-black sm:rounded-2xl"
                 }
+                // Largest 16:9 box that fits both screen width and height, so the
+                // video never overflows the viewport (no "too zoomed" crop).
+                style={cinema ? { width: "min(100vw, calc(100dvh * 16 / 9))" } : undefined}
               >
                 <div ref={playerBoxRef} className="h-full w-full" />
               </div>
