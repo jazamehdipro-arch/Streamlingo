@@ -88,6 +88,8 @@ export interface VocabItem {
   phonetic: string | null;
   firstSeenSourceId: string;
   timesEncountered: number;
+  /** Marked as already-known by the learner: kept for stats, excluded from reviews. */
+  known: boolean;
   createdAt: string;
 }
 

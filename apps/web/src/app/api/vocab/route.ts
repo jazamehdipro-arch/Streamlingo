@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { SrsState, VocabItem } from "@streamlingo/shared";
+import { createInitialSrsState, type SrsState, type VocabItem } from "@streamlingo/shared";
 import { getUserId } from "@/lib/auth";
 import { getServiceSupabase } from "@/lib/supabase";
 import { serverError, unauthorized } from "@/lib/http";
@@ -40,13 +40,22 @@ export async function GET(req: NextRequest) {
   const items: (VocabItem & { srs: SrsState })[] = [];
   for (const row of vocabRows ?? []) {
     const srsRow = srsByVocabId.get(row.id);
-    if (!srsRow) continue;
     // Words marked "known" leave the review loop entirely. Read defensively:
     // the column arrives with migration 0003 and older DBs simply lack it.
-    if (due && (row as { known?: boolean }).known === true) continue;
-    const srs = mapSrsState(srsRow);
-    if (due && new Date(srs.dueAt).getTime() > now) continue;
-    items.push({ ...mapVocabItem(row), srs });
+    const known = (row as { known?: boolean }).known === true;
+
+    if (due) {
+      if (known || !srsRow) continue;
+      const srs = mapSrsState(srsRow);
+      if (new Date(srs.dueAt).getTime() > now) continue;
+      items.push({ ...mapVocabItem(row), srs });
+    } else {
+      // Full bank: keep known words too (they may lack an SRS row when marked
+      // known straight from the overlay), synthesizing a default state so the
+      // page can still show a mastery badge and stats.
+      const srs = srsRow ? mapSrsState(srsRow) : createInitialSrsState(row.id);
+      items.push({ ...mapVocabItem(row), srs });
+    }
   }
 
   return NextResponse.json({ items });

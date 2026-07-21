@@ -1,18 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import type { ReviewQuality, SrsState, UserProfile, VocabItem } from "@streamlingo/shared";
+import {
+  reviewSrsState,
+  type ReviewQuality,
+  type SrsState,
+  type UserProfile,
+  type VocabItem,
+} from "@streamlingo/shared";
 import { speak } from "@/lib/tts";
 
 type VocabWithSrs = VocabItem & { srs: SrsState };
 
-const QUALITY_BUTTONS: { label: string; quality: ReviewQuality; className: string }[] = [
-  { label: "Encore", quality: 1, className: "border-red-300 text-red-700 hover:bg-red-50" },
-  { label: "Difficile", quality: 3, className: "border-amber-300 text-amber-700 hover:bg-amber-50" },
-  { label: "Bien", quality: 4, className: "border-green-300 text-green-700 hover:bg-green-50" },
-  { label: "Facile", quality: 5, className: "border-emerald-400 text-emerald-800 hover:bg-emerald-50" },
+const QUALITY_BUTTONS: { label: string; key: string; quality: ReviewQuality; className: string }[] = [
+  { label: "Encore", key: "1", quality: 1, className: "border-red-300 text-red-700 hover:bg-red-50" },
+  { label: "Difficile", key: "2", quality: 3, className: "border-amber-300 text-amber-700 hover:bg-amber-50" },
+  { label: "Bien", key: "3", quality: 4, className: "border-green-300 text-green-700 hover:bg-green-50" },
+  { label: "Facile", key: "4", quality: 5, className: "border-emerald-400 text-emerald-800 hover:bg-emerald-50" },
 ];
+
+/** Short human label for the next SM-2 interval, shown on each rating button. */
+function formatInterval(days: number): string {
+  if (days <= 0) return "< 1 j";
+  if (days === 1) return "1 j";
+  if (days < 30) return `${days} j`;
+  if (days < 365) return `~${Math.round(days / 30)} mois`;
+  return `~${Math.round(days / 365)} an`;
+}
+
+interface Summary {
+  again: number;
+  hard: number;
+  good: number;
+  easy: number;
+  known: number;
+}
+
+const EMPTY_SUMMARY: Summary = { again: 0, hard: 0, good: 0, easy: 0, known: 0 };
 
 export default function VocabReviewPage() {
   const [queue, setQueue] = useState<VocabWithSrs[] | null>(null);
@@ -21,6 +46,7 @@ export default function VocabReviewPage() {
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY);
 
   useEffect(() => {
     fetch("/api/vocab?due=true")
@@ -37,8 +63,10 @@ export default function VocabReviewPage() {
   }, []);
 
   const current = queue?.[position] ?? null;
+  const done = queue !== null && queue.length > 0 && position >= queue.length;
+  const reviewedCount = summary.again + summary.hard + summary.good + summary.easy + summary.known;
 
-  async function ensureExample(item: VocabWithSrs) {
+  const ensureExample = useCallback(async (item: VocabWithSrs) => {
     if (item.exampleSentence) return;
     try {
       const res = await fetch("/api/vocab/example", {
@@ -48,32 +76,87 @@ export default function VocabReviewPage() {
       });
       if (!res.ok) return;
       const example: { exampleSentence: string; exampleTranslation: string } = await res.json();
-      setQueue((prev) =>
-        prev ? prev.map((q) => (q.id === item.id ? { ...q, ...example } : q)) : prev
-      );
+      setQueue((prev) => (prev ? prev.map((q) => (q.id === item.id ? { ...q, ...example } : q)) : prev));
     } catch {
       // Bonus uniquement.
     }
-  }
-  const done = queue !== null && queue.length > 0 && position >= queue.length;
+  }, []);
 
-  async function review(quality: ReviewQuality) {
+  const reveal = useCallback(() => {
+    setRevealed(true);
+    if (current) void ensureExample(current);
+  }, [current, ensureExample]);
+
+  const review = useCallback(
+    async (quality: ReviewQuality) => {
+      if (!current) return;
+      setSubmitting(true);
+      setSummary((s) => ({
+        ...s,
+        again: s.again + (quality === 1 ? 1 : 0),
+        hard: s.hard + (quality === 3 ? 1 : 0),
+        good: s.good + (quality === 4 ? 1 : 0),
+        easy: s.easy + (quality === 5 ? 1 : 0),
+      }));
+      try {
+        await fetch(`/api/vocab/${current.id}/review`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quality }),
+        });
+        setRevealed(false);
+        setPosition((p) => p + 1);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Impossible d’enregistrer la révision");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [current]
+  );
+
+  const markKnown = useCallback(async () => {
     if (!current) return;
     setSubmitting(true);
+    setSummary((s) => ({ ...s, known: s.known + 1 }));
     try {
-      await fetch(`/api/vocab/${current.id}/review`, {
-        method: "POST",
+      await fetch(`/api/vocab/${current.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quality }),
+        body: JSON.stringify({ known: true }),
       });
       setRevealed(false);
       setPosition((p) => p + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible d’enregistrer la révision");
+      setError(err instanceof Error ? err.message : "Impossible d’enregistrer");
     } finally {
       setSubmitting(false);
     }
-  }
+  }, [current]);
+
+  // Keyboard: Space/Enter reveals; 1-4 rate; K marks known.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!current || submitting) return;
+      if (!revealed) {
+        if (e.code === "Space" || e.code === "Enter") {
+          e.preventDefault();
+          reveal();
+        }
+        return;
+      }
+      const btn = QUALITY_BUTTONS.find((b) => b.key === e.key);
+      if (btn) {
+        e.preventDefault();
+        void review(btn.quality);
+      } else if (e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        void markKnown();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current, revealed, submitting, reveal, review, markKnown]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 py-10 text-center">
@@ -90,6 +173,12 @@ export default function VocabReviewPage() {
         <div className="flex flex-col items-center gap-2">
           <span className="text-4xl">🎉</span>
           <p className="text-sm text-neutral-500">Rien à réviser pour le moment — beau travail.</p>
+          <Link
+            href="/vocab"
+            className="mt-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white transition hover:bg-neutral-700"
+          >
+            Retour au vocabulaire
+          </Link>
         </div>
       )}
 
@@ -106,13 +195,7 @@ export default function VocabReviewPage() {
           </p>
 
           <div className="flip-scene">
-            <div
-              className={`flip-card ${revealed ? "is-flipped" : ""}`}
-              onClick={() => {
-                setRevealed(true);
-                if (current) void ensureExample(current);
-              }}
-            >
+            <div className={`flip-card ${revealed ? "is-flipped" : ""}`} onClick={reveal}>
               <div className="flip-face flex min-h-56 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-neutral-200 p-8 shadow-sm">
                 <p className="text-3xl font-semibold">{current.lemma}</p>
                 <button
@@ -126,7 +209,7 @@ export default function VocabReviewPage() {
                 >
                   🔊
                 </button>
-                <p className="text-xs text-neutral-400">Touche la carte pour révéler</p>
+                <p className="text-xs text-neutral-400">Touche la carte ou Espace pour révéler</p>
               </div>
               <div className="flip-face flip-back flex min-h-56 flex-col items-center justify-center gap-3 rounded-2xl border border-neutral-900 bg-neutral-900 p-8 text-white shadow-md">
                 <p className="text-2xl font-semibold">{current.translation}</p>
@@ -144,30 +227,66 @@ export default function VocabReviewPage() {
           </div>
 
           {revealed && (
-            <div className="grid grid-cols-4 gap-2">
-              {QUALITY_BUTTONS.map((btn) => (
-                <button
-                  key={btn.label}
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => review(btn.quality)}
-                  className={`rounded-xl border py-2.5 text-sm font-medium transition disabled:opacity-50 ${btn.className}`}
-                >
-                  {btn.label}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-4 gap-2">
+                {QUALITY_BUTTONS.map((btn) => {
+                  const projected = reviewSrsState(current.srs, btn.quality, new Date());
+                  return (
+                    <button
+                      key={btn.label}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => review(btn.quality)}
+                      className={`flex flex-col items-center gap-0.5 rounded-xl border py-2 text-sm font-medium transition disabled:opacity-50 ${btn.className}`}
+                    >
+                      <span>{btn.label}</span>
+                      <span className="text-[10px] font-normal opacity-70">
+                        {formatInterval(projected.intervalDays)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={markKnown}
+                className="text-xs text-neutral-400 underline-offset-2 transition hover:text-emerald-700 hover:underline disabled:opacity-50"
+              >
+                Je connais déjà ce mot — ne plus le réviser
+              </button>
+              <p className="text-[10px] text-neutral-300">Raccourcis : 1 · 2 · 3 · 4 pour noter, K pour « connu »</p>
+            </>
           )}
         </div>
       )}
 
       {done && (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex w-full flex-col items-center gap-4">
           <span className="text-4xl">🏆</span>
           <p className="text-sm text-neutral-500">
-            Session terminée — {queue?.length} mot{(queue?.length ?? 0) > 1 ? "s" : ""} révisé
-            {(queue?.length ?? 0) > 1 ? "s" : ""}.
+            Session terminée — {reviewedCount} mot{reviewedCount > 1 ? "s" : ""} passé
+            {reviewedCount > 1 ? "s" : ""} en revue.
           </p>
+          <div className="grid w-full grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-red-700">
+              À revoir <span className="float-right font-semibold">{summary.again}</span>
+            </div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-amber-700">
+              Difficiles <span className="float-right font-semibold">{summary.hard}</span>
+            </div>
+            <div className="rounded-xl border border-green-100 bg-green-50 px-3 py-2 text-green-700">
+              Bien <span className="float-right font-semibold">{summary.good}</span>
+            </div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-emerald-800">
+              Faciles <span className="float-right font-semibold">{summary.easy}</span>
+            </div>
+            {summary.known > 0 && (
+              <div className="col-span-2 rounded-xl border border-neutral-200 px-3 py-2 text-neutral-600">
+                Marqués connus <span className="float-right font-semibold">{summary.known}</span>
+              </div>
+            )}
+          </div>
           <Link
             href="/vocab"
             className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white transition hover:bg-neutral-700"

@@ -78,7 +78,7 @@ function check(label, fn) {
 
 // ---- SM-2 ----
 {
-  const { createInitialSrsState, reviewSrsState, isDue } = await bundle("packages/shared/src/srs.ts", "srs");
+  const { createInitialSrsState, reviewSrsState, isDue, masteryOf } = await bundle("packages/shared/src/srs.ts", "srs");
   const now = new Date("2026-01-01T00:00:00Z");
   const day = (n) => new Date(now.getTime() + n * 86400000);
 
@@ -108,6 +108,12 @@ function check(label, fn) {
     let s = createInitialSrsState("v1");
     for (let i = 0; i < 10; i++) s = reviewSrsState(s, 0, day(i));
     assert.ok(s.easeFactor >= 1.3);
+  });
+  check("mastery climbs new → learning → familiar → mastered", () => {
+    assert.equal(masteryOf(createInitialSrsState("v1")), "new");
+    assert.equal(masteryOf({ intervalDays: 6, repetitions: 2 }), "learning");
+    assert.equal(masteryOf({ intervalDays: 30, repetitions: 4 }), "familiar");
+    assert.equal(masteryOf({ intervalDays: 120, repetitions: 6 }), "mastered");
   });
 }
 

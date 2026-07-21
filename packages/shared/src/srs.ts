@@ -58,6 +58,25 @@ export function isDue(state: SrsState, now: Date = new Date()): boolean {
   return new Date(state.dueAt).getTime() <= now.getTime();
 }
 
+/**
+ * How well a word is anchored in memory, derived from its SM-2 state. Drives
+ * the mastery badge and lets learners see progress at a glance rather than a
+ * raw due-date. Thresholds mirror Anki's convention (a card is "mature" once
+ * its interval passes ~21 days).
+ *   new        never successfully reviewed
+ *   learning   a few good reviews, still short intervals
+ *   familiar   interval has grown past ~3 weeks
+ *   mastered   interval past ~3 months, effectively long-term
+ */
+export type Mastery = "new" | "learning" | "familiar" | "mastered";
+
+export function masteryOf(state: SrsState): Mastery {
+  if (state.repetitions === 0) return "new";
+  if (state.intervalDays >= 90) return "mastered";
+  if (state.intervalDays >= 21) return "familiar";
+  return "learning";
+}
+
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);

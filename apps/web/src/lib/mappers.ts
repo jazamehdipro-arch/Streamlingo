@@ -78,6 +78,7 @@ export interface VocabItemRow {
   phonetic: string | null;
   first_seen_source_id: string | null;
   times_encountered: number;
+  known?: boolean | null;
   created_at: string;
 }
 
@@ -167,6 +168,7 @@ export function mapVocabItem(row: VocabItemRow): VocabItem {
     phonetic: row.phonetic,
     firstSeenSourceId: row.first_seen_source_id ?? "",
     timesEncountered: row.times_encountered,
+    known: row.known === true,
     createdAt: row.created_at,
   };
 }
