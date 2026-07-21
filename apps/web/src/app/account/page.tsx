@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { CEFR_LEVELS, LEVEL_PROFILES, type CefrLevel, type UserProfile } from "@streamlingo/shared";
 import BillingPanel from "@/components/BillingPanel";
+import { getBrowserSupabase } from "@/lib/supabase";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -22,6 +23,13 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Change password
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState<string | null>(null);
+  const [pwError, setPwError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -57,6 +65,34 @@ export default function AccountPage() {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMessage(null);
+    setPwError(null);
+    if (newPassword.length < 6) {
+      setPwError("Le mot de passe doit faire au moins 6 caractères.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const { error: updateError } = await getBrowserSupabase().auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw new Error(updateError.message);
+      setNewPassword("");
+      setConfirmPassword("");
+      setPwMessage("Mot de passe mis à jour ✓");
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : "Impossible de changer le mot de passe");
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -157,6 +193,52 @@ export default function AccountPage() {
           className="rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {saving ? "Enregistrement…" : saved ? "Enregistré ✓" : "Enregistrer"}
+        </button>
+      </form>
+
+      <form onSubmit={changePassword} className="flex flex-col gap-3 border-t border-neutral-100 pt-5">
+        <div>
+          <h2 className="text-sm font-medium">Changer de mot de passe</h2>
+          <p className="text-xs text-neutral-500">Au moins 6 caractères.</p>
+        </div>
+
+        {pwError && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{pwError}</p>
+        )}
+        {pwMessage && (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {pwMessage}
+          </p>
+        )}
+
+        <input
+          type="password"
+          value={newPassword}
+          onChange={(e) => {
+            setNewPassword(e.target.value);
+            setPwMessage(null);
+          }}
+          placeholder="Nouveau mot de passe"
+          autoComplete="new-password"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+        />
+        <input
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => {
+            setConfirmPassword(e.target.value);
+            setPwMessage(null);
+          }}
+          placeholder="Confirme le nouveau mot de passe"
+          autoComplete="new-password"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+        />
+        <button
+          type="submit"
+          disabled={pwSaving || newPassword.length === 0}
+          className="self-start rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-900 disabled:opacity-50"
+        >
+          {pwSaving ? "Mise à jour…" : "Mettre à jour le mot de passe"}
         </button>
       </form>
 
