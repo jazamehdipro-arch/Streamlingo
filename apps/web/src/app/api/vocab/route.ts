@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createInitialSrsState, type SrsState, type VocabItem } from "@streamlingo/shared";
+import {
+  createInitialSrsState,
+  DAILY_REVIEW_CAP,
+  type SrsState,
+  type VocabItem,
+} from "@streamlingo/shared";
 import { getUserId } from "@/lib/auth";
 import { getServiceSupabase } from "@/lib/supabase";
 import { serverError, unauthorized } from "@/lib/http";
@@ -58,5 +63,34 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ items });
+  if (!due) return NextResponse.json({ items });
+
+  // Daily cap for the review queue. Overdue "revenants" (already reviewed at
+  // least once) come first — their memory is actively fading — then brand-new
+  // words fill the remaining slots. Both count toward the same daily budget.
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const reviewedToday = (srsRows ?? []).filter(
+    (r) => r.last_reviewed_at && new Date(r.last_reviewed_at).getTime() >= todayStart.getTime()
+  ).length;
+
+  items.sort((a, b) => {
+    const aNew = a.srs.repetitions === 0 ? 1 : 0;
+    const bNew = b.srs.repetitions === 0 ? 1 : 0;
+    if (aNew !== bNew) return aNew - bNew; // revenants before nouveaux
+    return new Date(a.srs.dueAt).getTime() - new Date(b.srs.dueAt).getTime(); // most overdue first
+  });
+
+  const remainingToday = Math.max(0, DAILY_REVIEW_CAP - reviewedToday);
+  const capped = items.slice(0, remainingToday);
+
+  return NextResponse.json({
+    items: capped,
+    meta: {
+      cap: DAILY_REVIEW_CAP,
+      reviewedToday,
+      remainingToday,
+      totalDue: items.length,
+    },
+  });
 }

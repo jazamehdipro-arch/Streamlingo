@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { masteryOf, type Mastery, type SrsState, type UserProfile, type VocabItem } from "@streamlingo/shared";
+import {
+  DAILY_REVIEW_CAP,
+  masteryOf,
+  type Mastery,
+  type SrsState,
+  type UserProfile,
+  type VocabItem,
+} from "@streamlingo/shared";
 import { speak } from "@/lib/tts";
 
 type VocabWithSrs = VocabItem & { srs: SrsState };
@@ -167,7 +174,7 @@ export default function VocabPage() {
           href="/vocab/review"
           className="rounded-full bg-neutral-900 px-4 py-2 text-sm text-white transition hover:bg-neutral-700"
         >
-          Réviser {stats.due > 0 ? `(${stats.due})` : ""}
+          Réviser {stats.due > 0 ? `(${Math.min(stats.due, DAILY_REVIEW_CAP)})` : ""}
         </Link>
       </div>
 

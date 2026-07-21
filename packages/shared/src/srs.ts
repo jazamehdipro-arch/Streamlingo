@@ -2,6 +2,13 @@ import type { ReviewQuality, SrsState } from "./types";
 
 const MIN_EASE_FACTOR = 1.3;
 
+/**
+ * Maximum words surfaced in the review queue per calendar day. Keeps the
+ * session from becoming overwhelming after a break: overdue words ("revenants")
+ * are served first, then newly encountered words fill the remaining slots.
+ */
+export const DAILY_REVIEW_CAP = 20;
+
 export function createInitialSrsState(vocabItemId: string): SrsState {
   return {
     vocabItemId,

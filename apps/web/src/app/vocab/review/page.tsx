@@ -39,6 +39,13 @@ interface Summary {
 
 const EMPTY_SUMMARY: Summary = { again: 0, hard: 0, good: 0, easy: 0, known: 0 };
 
+interface ReviewMeta {
+  cap: number;
+  reviewedToday: number;
+  remainingToday: number;
+  totalDue: number;
+}
+
 export default function VocabReviewPage() {
   const [queue, setQueue] = useState<VocabWithSrs[] | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -47,6 +54,7 @@ export default function VocabReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY);
+  const [meta, setMeta] = useState<ReviewMeta | null>(null);
 
   useEffect(() => {
     fetch("/api/vocab?due=true")
@@ -54,7 +62,10 @@ export default function VocabReviewPage() {
         if (!res.ok) throw new Error(`Impossible de charger la file de révision (${res.status})`);
         return res.json();
       })
-      .then((body: { items: VocabWithSrs[] }) => setQueue(body.items))
+      .then((body: { items: VocabWithSrs[]; meta?: ReviewMeta }) => {
+        setQueue(body.items);
+        if (body.meta) setMeta(body.meta);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Impossible de charger la file de révision"));
     fetch("/api/profile")
       .then((res) => (res.ok ? res.json() : null))
@@ -171,8 +182,23 @@ export default function VocabReviewPage() {
 
       {queue && queue.length === 0 && (
         <div className="flex flex-col items-center gap-2">
-          <span className="text-4xl">🎉</span>
-          <p className="text-sm text-neutral-500">Rien à réviser pour le moment — beau travail.</p>
+          {meta && meta.remainingToday === 0 && meta.totalDue > 0 ? (
+            <>
+              <span className="text-4xl">✅</span>
+              <p className="text-sm text-neutral-500">
+                Tu as fait tes {meta.cap} révisions du jour — bravo&nbsp;!
+              </p>
+              <p className="text-xs text-neutral-400">
+                Il reste {meta.totalDue} mot{meta.totalDue > 1 ? "s" : ""} qui t’attendent demain, pour
+                ne pas te surcharger aujourd’hui.
+              </p>
+            </>
+          ) : (
+            <>
+              <span className="text-4xl">🎉</span>
+              <p className="text-sm text-neutral-500">Rien à réviser pour le moment — beau travail.</p>
+            </>
+          )}
           <Link
             href="/vocab"
             className="mt-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm text-white transition hover:bg-neutral-700"
@@ -273,6 +299,13 @@ export default function VocabReviewPage() {
             Session terminée — {reviewedCount} mot{reviewedCount > 1 ? "s" : ""} passé
             {reviewedCount > 1 ? "s" : ""} en revue.
           </p>
+          {meta && meta.totalDue > (queue?.length ?? 0) && (
+            <p className="text-xs text-neutral-400">
+              Tu as atteint ton plafond de {meta.cap}/jour. Il reste{" "}
+              {meta.totalDue - (queue?.length ?? 0)} mot
+              {meta.totalDue - (queue?.length ?? 0) > 1 ? "s" : ""} pour demain.
+            </p>
+          )}
           <div className="grid w-full grid-cols-2 gap-2 text-sm">
             <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-red-700">
               À revoir <span className="float-right font-semibold">{summary.again}</span>
