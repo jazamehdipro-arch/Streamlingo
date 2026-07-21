@@ -17,8 +17,8 @@ export default function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // The landing and login pages carry their own full-page layouts.
-  if (pathname === "/" || pathname === "/login") return null;
+  // The landing, login and password-reset pages carry their own full-page layouts.
+  if (pathname === "/" || pathname === "/login" || pathname === "/reset-password") return null;
 
   async function signOut() {
     try {
