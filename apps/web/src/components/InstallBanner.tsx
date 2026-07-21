@@ -5,25 +5,26 @@ import { useEffect, useState } from "react";
 const DISMISS_KEY = "sl-install-dismissed";
 
 type Platform = "ios" | "android" | "other";
+type Step = { text: string; img?: string };
 
-const STEPS: Record<Platform, string[]> = {
+const STEPS: Record<Platform, Step[]> = {
   ios: [
-    "Appuie sur le bouton Partager (le carré avec une flèche ↑) en bas de Safari.",
-    "Fais défiler et choisis « Sur l’écran d’accueil ».",
-    "Appuie sur « Ajouter » en haut à droite.",
-    "Ouvre StreamLingo depuis la nouvelle icône — plus aucune barre, plein écran.",
+    { text: "Ouvre le menu ••• de Safari, puis appuie sur « Partager ».", img: "/install/step1.webp" },
+    { text: "Fais défiler et choisis « Sur l’écran d’accueil ».", img: "/install/step2.webp" },
+    { text: "Appuie sur « Ajouter » en haut à droite.", img: "/install/step3.webp" },
+    { text: "Ouvre StreamLingo depuis la nouvelle icône — plein écran, sans barre." },
   ],
   android: [
-    "Ouvre le menu (⋮) en haut à droite de Chrome.",
-    "Choisis « Ajouter à l’écran d’accueil » (ou « Installer l’application »).",
-    "Confirme avec « Ajouter » / « Installer ».",
-    "Ouvre StreamLingo depuis la nouvelle icône — plus aucune barre, plein écran.",
+    { text: "Ouvre le menu (⋮) en haut à droite de Chrome." },
+    { text: "Choisis « Ajouter à l’écran d’accueil » (ou « Installer l’application »)." },
+    { text: "Confirme avec « Ajouter » / « Installer »." },
+    { text: "Ouvre StreamLingo depuis la nouvelle icône — plein écran, sans barre." },
   ],
   other: [
-    "Ouvre le menu de ton navigateur.",
-    "Cherche « Ajouter à l’écran d’accueil » ou « Installer l’application ».",
-    "Confirme.",
-    "Ouvre StreamLingo depuis la nouvelle icône.",
+    { text: "Ouvre le menu de ton navigateur." },
+    { text: "Cherche « Ajouter à l’écran d’accueil » ou « Installer l’application »." },
+    { text: "Confirme." },
+    { text: "Ouvre StreamLingo depuis la nouvelle icône." },
   ],
 };
 
@@ -94,7 +95,7 @@ export default function InstallBanner() {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-t-3xl bg-white p-6 sm:rounded-3xl"
+            className="max-h-[88vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-6 sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -114,13 +115,23 @@ export default function InstallBanner() {
               navigateur.
             </p>
 
-            <ol className="flex flex-col gap-3">
+            <ol className="flex flex-col gap-4">
               {STEPS[platform].map((step, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-xs font-medium text-white">
-                    {i + 1}
-                  </span>
-                  <span className="pt-0.5 text-neutral-700">{step}</span>
+                <li key={i} className="flex flex-col gap-2 text-sm">
+                  <div className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-xs font-medium text-white">
+                      {i + 1}
+                    </span>
+                    <span className="pt-0.5 text-neutral-700">{step.text}</span>
+                  </div>
+                  {step.img && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={step.img}
+                      alt={`Étape ${i + 1}`}
+                      className="ml-9 w-full max-w-[240px] rounded-xl border border-neutral-200"
+                    />
+                  )}
                 </li>
               ))}
             </ol>
