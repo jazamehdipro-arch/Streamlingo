@@ -300,9 +300,13 @@ export default function VocabPage() {
                       ? "border-neutral-200 text-neutral-500 hover:border-neutral-900"
                       : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                   }`}
-                  title={item.known ? "Remettre dans les révisions" : "Je connais ce mot"}
+                  title={
+                    item.known
+                      ? "Remettre ce mot dans les révisions"
+                      : "Je connais déjà ce mot — le retirer des révisions"
+                  }
                 >
-                  {item.known ? "Revoir" : "Connaître ✓"}
+                  {item.known ? "Remettre" : "Je connais"}
                 </button>
                 <button
                   type="button"

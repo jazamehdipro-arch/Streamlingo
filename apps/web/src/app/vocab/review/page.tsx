@@ -14,7 +14,7 @@ import { speak } from "@/lib/tts";
 type VocabWithSrs = VocabItem & { srs: SrsState };
 
 const QUALITY_BUTTONS: { label: string; key: string; quality: ReviewQuality; className: string }[] = [
-  { label: "Encore", key: "1", quality: 1, className: "border-red-300 text-red-700 hover:bg-red-50" },
+  { label: "Oublié", key: "1", quality: 1, className: "border-red-300 text-red-700 hover:bg-red-50" },
   { label: "Difficile", key: "2", quality: 3, className: "border-amber-300 text-amber-700 hover:bg-amber-50" },
   { label: "Bien", key: "3", quality: 4, className: "border-green-300 text-green-700 hover:bg-green-50" },
   { label: "Facile", key: "4", quality: 5, className: "border-emerald-400 text-emerald-800 hover:bg-emerald-50" },
@@ -228,6 +228,7 @@ export default function VocabReviewPage() {
 
           {revealed && (
             <>
+              <p className="text-sm font-medium text-neutral-700">Tu t’en souvenais&nbsp;?</p>
               <div className="grid grid-cols-4 gap-2">
                 {QUALITY_BUTTONS.map((btn) => {
                   const projected = reviewSrsState(current.srs, btn.quality, new Date());
@@ -247,6 +248,10 @@ export default function VocabReviewPage() {
                   );
                 })}
               </div>
+              <p className="text-[11px] leading-snug text-neutral-400">
+                Le délai sous chaque bouton indique quand le mot te sera reproposé. Plus c’était
+                facile, plus il revient tard — c’est la répétition espacée.
+              </p>
               <button
                 type="button"
                 disabled={submitting}
