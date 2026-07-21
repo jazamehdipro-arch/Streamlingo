@@ -467,7 +467,7 @@ export default function WatchPage() {
               </button>
 
               {cinema && (
-                <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-white/50">
+                <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-white/50 landscape:hidden">
                   Tourne ton téléphone · touche ✕ pour revenir
                 </p>
               )}

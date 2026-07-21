@@ -16,6 +16,9 @@ export const viewport = {
   themeColor: "#101014",
   width: "device-width",
   initialScale: 1,
+  // Extend under the notch / home indicator so the installed (home-screen) app
+  // renders truly edge-to-edge, including the "Grand écran" video mode.
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
