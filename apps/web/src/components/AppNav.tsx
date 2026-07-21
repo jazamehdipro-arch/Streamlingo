@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/vocab/review", label: "Réviser" },
   { href: "/connect-extension", label: "Extension" },
   { href: "/pricing", label: "Pro" },
+  { href: "/account", label: "Compte" },
 ];
 
 export default function AppNav() {
