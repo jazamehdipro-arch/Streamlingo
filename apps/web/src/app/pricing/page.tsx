@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface PlanStatus {
   plan: "free" | "pro";
   analyzedSeconds: number;
   limitSeconds: number;
   remainingSeconds: number;
+  subscription: { nextBillingAt: string | null; cancelAtPeriodEnd: boolean } | null;
 }
 
 const FREE_FEATURES = [
@@ -25,17 +27,58 @@ const PRO_FEATURES = [
 ];
 
 export default function PricingPage() {
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center" />}>
+      <PricingInner />
+    </Suspense>
+  );
+}
+
+function PricingInner() {
+  const searchParams = useSearchParams();
+  const justPaid = searchParams.get("success") === "1";
+
   const [status, setStatus] = useState<PlanStatus | null>(null);
   const [billing, setBilling] = useState<"annual" | "monthly">("annual");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Right after checkout the webhook may lag a second or two; poll until Pro.
+  const [waitingForPro, setWaitingForPro] = useState(justPaid);
+
+  async function refresh(): Promise<PlanStatus | null> {
+    try {
+      const res = await fetch("/api/billing/status");
+      if (!res.ok) return null;
+      const data: PlanStatus = await res.json();
+      setStatus(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }
 
   useEffect(() => {
-    fetch("/api/billing/status")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: PlanStatus | null) => setStatus(data))
-      .catch(() => {});
+    // refresh's setState happens after an async fetch, not synchronously here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!waitingForPro) return;
+    let tries = 0;
+    const interval = setInterval(async () => {
+      tries += 1;
+      const data = await refresh();
+      if (data?.plan === "pro" || tries >= 8) {
+        // Async-callback setState (post-fetch), not a synchronous effect update.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setWaitingForPro(false);
+        clearInterval(interval);
+      }
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [waitingForPro]);
 
   async function checkout() {
     setBusy(true);
@@ -67,6 +110,70 @@ export default function PricingPage() {
     }
   }
 
+  // ---- Pro account view ----
+  if (status?.plan === "pro") {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 px-6 py-12">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-900 text-2xl">
+            ✨
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight">Tu es Pro</h1>
+          <p className="text-sm text-neutral-500">Analyse de vidéo illimitée, merci de ton soutien 💛</p>
+        </div>
+
+        <div className="rounded-2xl border border-neutral-200 p-5">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">StreamLingo Pro</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              Actif
+            </span>
+          </div>
+          {status.subscription?.nextBillingAt && (
+            <p className="mt-3 text-sm text-neutral-500">
+              {status.subscription.cancelAtPeriodEnd ? (
+                <>
+                  Ton accès Pro reste actif jusqu&apos;au{" "}
+                  <span className="font-medium text-neutral-900">
+                    {new Date(status.subscription.nextBillingAt).toLocaleDateString("fr-FR")}
+                  </span>
+                  , puis reviendra au plan gratuit (pas de renouvellement).
+                </>
+              ) : (
+                <>
+                  Prochaine facturation le{" "}
+                  <span className="font-medium text-neutral-900">
+                    {new Date(status.subscription.nextBillingAt).toLocaleDateString("fr-FR")}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
+        </div>
+
+        <ul className="flex flex-col gap-2 text-sm text-neutral-600">
+          {PRO_FEATURES.map((f) => (
+            <li key={f}>✓ {f}</li>
+          ))}
+        </ul>
+
+        <button
+          type="button"
+          onClick={openPortal}
+          disabled={busy}
+          className="rounded-full border border-neutral-300 py-3 text-sm font-medium transition hover:border-neutral-900 disabled:opacity-50"
+        >
+          {busy ? "Ouverture…" : "Gérer le paiement ou annuler"}
+        </button>
+
+        <p className="text-center text-xs text-neutral-400">
+          Facturation gérée par Stripe · Annulable à tout moment
+        </p>
+      </main>
+    );
+  }
+
+  // ---- Free / sales view ----
   const usagePct =
     status && status.limitSeconds > 0
       ? Math.min(100, Math.round((status.analyzedSeconds / status.limitSeconds) * 100))
@@ -80,6 +187,12 @@ export default function PricingPage() {
           Commence gratuitement. Passe en Pro quand tu regardes plus que tu ne l’imaginais.
         </p>
       </div>
+
+      {waitingForPro && (
+        <p className="mx-auto rounded-full bg-neutral-100 px-4 py-2 text-sm text-neutral-600">
+          Paiement reçu — activation de ton compte Pro…
+        </p>
+      )}
 
       {status && status.plan === "free" && (
         <div className="mx-auto w-full max-w-md rounded-2xl border border-neutral-200 p-4">
@@ -134,7 +247,7 @@ export default function PricingPage() {
             ))}
           </ul>
           <p className="mt-auto rounded-full border border-neutral-200 py-2 text-center text-sm text-neutral-400">
-            {status?.plan === "free" ? "Ton plan actuel" : "Inclus dans Pro"}
+            Ton plan actuel
           </p>
         </div>
 
@@ -165,25 +278,14 @@ export default function PricingPage() {
               <li key={f}>✓ {f}</li>
             ))}
           </ul>
-          {status?.plan === "pro" ? (
-            <button
-              type="button"
-              onClick={openPortal}
-              disabled={busy}
-              className="mt-auto rounded-full border border-neutral-900 py-2.5 text-sm font-medium transition hover:bg-neutral-100 disabled:opacity-50"
-            >
-              Gérer mon abonnement
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={checkout}
-              disabled={busy}
-              className="mt-auto rounded-full bg-neutral-900 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
-            >
-              {busy ? "Redirection…" : "Passer en Pro"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={checkout}
+            disabled={busy}
+            className="mt-auto rounded-full bg-neutral-900 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
+          >
+            {busy ? "Redirection…" : "Passer en Pro"}
+          </button>
         </div>
       </div>
 
