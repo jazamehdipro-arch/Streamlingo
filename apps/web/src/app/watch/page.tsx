@@ -29,6 +29,11 @@ interface FeedWord extends KeywordCue {
   id: string;
 }
 
+// On-video subtitle overlay: keep the last few words for a few seconds each, so
+// reading happens in place (no list reflow) instead of words flashing past.
+const OVERLAY_SECONDS = 7;
+const OVERLAY_MAX = 2;
+
 interface AnalyzedSegment {
   segmentId: string;
   keywordCues: KeywordCue[];
@@ -66,9 +71,13 @@ export default function WatchPage() {
   const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
   const [quizOffer, setQuizOffer] = useState<string | null>(null);
   const [knownLemmas, setKnownLemmas] = useState<Set<string>>(new Set());
+  const [overlay, setOverlay] = useState<FeedWord[]>([]);
+  const [cinema, setCinema] = useState(false);
 
   const playerRef = useRef<YTPlayer | null>(null);
   const playerBoxRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<{ cue: FeedWord; at: number }[]>([]);
+  const lastOverlayIdsRef = useRef("");
   const stateRef = useRef<{
     sourceId: string | null;
     segments: LocalSegment[];
@@ -160,9 +169,22 @@ export default function WatchPage() {
         st.shownKeys.add(key);
         if (t - cue.startSeconds <= FRESHNESS_SECONDS) {
           const id = `${key}:${Date.now()}`;
-          setFeed((prev) => [{ ...cue, id }, ...prev].slice(0, 60));
+          const fw = { ...cue, id };
+          setFeed((prev) => [fw, ...prev].slice(0, 60));
+          overlayRef.current.push({ cue: fw, at: cue.startSeconds });
         }
       }
+    }
+
+    // Refresh the on-video overlay: drop words older than OVERLAY_SECONDS (in
+    // video time, so they persist while paused) and keep only the last few.
+    overlayRef.current = overlayRef.current
+      .filter((o) => t - o.at <= OVERLAY_SECONDS)
+      .slice(-OVERLAY_MAX);
+    const ids = overlayRef.current.map((o) => o.cue.id).join(",");
+    if (ids !== lastOverlayIdsRef.current) {
+      lastOverlayIdsRef.current = ids;
+      setOverlay(overlayRef.current.map((o) => o.cue));
     }
   }
 
@@ -207,6 +229,9 @@ export default function WatchPage() {
           st.posting = new Set();
           st.shownKeys = new Set();
           st.lastSegment = -1;
+          overlayRef.current = [];
+          lastOverlayIdsRef.current = "";
+          setOverlay([]);
           setFeed([]);
           setVideoId(id);
           setStatus(null);
@@ -244,6 +269,9 @@ export default function WatchPage() {
       st.posting = new Set();
       st.shownKeys = new Set();
       st.lastSegment = -1;
+      overlayRef.current = [];
+      lastOverlayIdsRef.current = "";
+      setOverlay([]);
 
       setFeed([]);
       setVideoId(id);
@@ -269,6 +297,8 @@ export default function WatchPage() {
       if (cancelled || !window.YT || !playerBoxRef.current) return;
       playerRef.current = new window.YT.Player(playerBoxRef.current, {
         videoId,
+        width: "100%",
+        height: "100%",
         playerVars: { playsinline: 1, rel: 0 },
         events: {
           onReady: () => {
@@ -395,9 +425,52 @@ export default function WatchPage() {
 
       {videoId && (
         <>
-          <div className="sticky top-14 z-30 -mx-4 sm:mx-0">
-            <div className="aspect-video w-full overflow-hidden bg-black sm:rounded-2xl">
-              <div ref={playerBoxRef} className="h-full w-full" />
+          <div
+            className={
+              cinema
+                ? "fixed inset-0 z-50 flex items-center bg-black"
+                : "sticky top-14 z-30 -mx-4 sm:mx-0"
+            }
+          >
+            <div className="relative w-full">
+              <div
+                className={
+                  cinema
+                    ? "mx-auto aspect-video max-h-[100dvh] w-full"
+                    : "aspect-video w-full overflow-hidden bg-black sm:rounded-2xl"
+                }
+              >
+                <div ref={playerBoxRef} className="h-full w-full" />
+              </div>
+
+              {overlay.length > 0 && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-0.5 bg-gradient-to-b from-black/75 via-black/40 to-transparent px-3 pb-6 pt-2">
+                  {overlay.map((w) => (
+                    <p
+                      key={w.id}
+                      className="text-center text-sm font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+                    >
+                      <span className="font-semibold">{w.word}</span>
+                      <span className="text-indigo-200"> — {w.translation}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setCinema((c) => !c)}
+                className="absolute right-2 top-2 z-10 flex h-9 items-center gap-1 rounded-full bg-black/60 px-3 text-xs font-medium text-white backdrop-blur"
+                title={cinema ? "Quitter le grand écran" : "Grand écran"}
+              >
+                {cinema ? "✕ Quitter" : "⤢ Grand écran"}
+              </button>
+
+              {cinema && (
+                <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-white/50">
+                  Tourne ton téléphone · touche ✕ pour revenir
+                </p>
+              )}
             </div>
           </div>
 
