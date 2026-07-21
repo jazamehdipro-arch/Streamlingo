@@ -7,7 +7,6 @@ import { syncSessionCookie } from "@/lib/authClient";
 
 const LINKS = [
   { href: "/watch", label: "YouTube" },
-  { href: "/learn", label: "Podcast" },
   { href: "/vocab", label: "Vocabulaire" },
   { href: "/vocab/review", label: "Réviser" },
   { href: "/connect-extension", label: "Extension" },
