@@ -2,7 +2,7 @@
   "name": "StreamLingo",
   "short_name": "StreamLingo",
   "description": "Apprends une langue avec les vidéos que tu regardes déjà.",
-  "start_url": "/",
+  "start_url": "/watch",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#101014",

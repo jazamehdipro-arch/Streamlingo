@@ -32,7 +32,12 @@ export default function AppNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/85 backdrop-blur">
+    <header
+      className="sticky top-0 z-40 border-b border-neutral-200 bg-white/85 backdrop-blur"
+      // Installed on iOS the status bar is translucent (viewport-fit=cover), so
+      // reserve its height or the tabs render under the clock and can't be tapped.
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
       <nav className="mx-auto flex h-14 max-w-4xl items-center justify-between gap-2 overflow-x-auto px-4 sm:px-6">
         <Link href="/watch" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-xs text-white">
