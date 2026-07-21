@@ -12,6 +12,8 @@ import {
 } from "@streamlingo/shared";
 import QuizModal from "@/components/QuizModal";
 import { speak } from "@/lib/tts";
+import { getBrowserSupabase } from "@/lib/supabase";
+import { syncSessionCookie } from "@/lib/authClient";
 
 /** Minimal typings for the official YouTube IFrame Player API. */
 interface YTPlayer {
@@ -89,19 +91,33 @@ export default function WatchPage() {
   }>({ sourceId: null, segments: [], analyzed: new Map(), posting: new Set(), shownKeys: new Set(), lastSegment: -1 });
 
   useEffect(() => {
-    fetch("/api/profile")
-      .then(async (res) => {
+    async function loadProfile() {
+      try {
+        let res = await fetch("/api/profile");
+        // A 401 usually means the auth cookie went stale (token expired, or a
+        // fresh storage container in the installed app). Refresh the session,
+        // re-sync the cookie, and retry once before giving up to the login page.
+        if (res.status === 401) {
+          const { data } = await getBrowserSupabase().auth.getSession();
+          syncSessionCookie(data.session);
+          res = await fetch("/api/profile");
+        }
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
         if (!res.ok) throw new Error(`Impossible de charger le profil (${res.status})`);
-        return res.json();
-      })
-      .then((data: UserProfile | null) => {
+        const data: UserProfile | null = await res.json();
         if (!data) {
           router.replace("/onboarding");
           return;
         }
         setProfile(data);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Impossible de charger le profil"));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Impossible de charger le profil");
+      }
+    }
+    void loadProfile();
   }, [router]);
 
   async function analyzeSegment(index: number) {
