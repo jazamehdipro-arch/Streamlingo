@@ -86,14 +86,21 @@ function check(label, fn) {
   check("new item is due immediately", () => {
     assert.ok(isDue(createInitialSrsState("v1"), new Date()));
   });
-  check("good reviews follow the 1d, 6d, then EF-scaled ladder", () => {
+  check("good reviews follow the 2d, 6d, then EF-scaled ladder", () => {
     let s = createInitialSrsState("v1");
     s = reviewSrsState(s, 4, now);
-    assert.equal(s.intervalDays, 1);
+    assert.equal(s.intervalDays, 2);
     s = reviewSrsState(s, 4, day(1));
     assert.equal(s.intervalDays, 6);
     s = reviewSrsState(s, 4, day(7));
     assert.ok(s.intervalDays > 6);
+  });
+  check("first-review intervals fan out by quality (Hard<Good<Easy)", () => {
+    const base = createInitialSrsState("v1");
+    const hard = reviewSrsState(base, 3, now).intervalDays;
+    const good = reviewSrsState(base, 4, now).intervalDays;
+    const easy = reviewSrsState(base, 5, now).intervalDays;
+    assert.ok(hard < good && good < easy);
   });
   check("a failed review resets the streak and re-queues today", () => {
     let s = createInitialSrsState("v1");

@@ -39,9 +39,12 @@ export function reviewSrsState(
   }
 
   const repetitions = state.repetitions + 1;
+  // Early intervals fan out by recall quality so the four choices are visibly
+  // different from the very first review (Difficile sooner, Facile later).
+  // Later reviews follow the classic SM-2 ease-scaled ladder.
   let intervalDays: number;
-  if (repetitions === 1) intervalDays = 1;
-  else if (repetitions === 2) intervalDays = 6;
+  if (repetitions === 1) intervalDays = quality === 3 ? 1 : quality === 4 ? 2 : 4;
+  else if (repetitions === 2) intervalDays = quality === 3 ? 4 : quality === 4 ? 6 : 9;
   else intervalDays = Math.round(state.intervalDays * easeFactor);
 
   return {
