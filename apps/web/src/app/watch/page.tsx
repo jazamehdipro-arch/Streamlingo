@@ -78,6 +78,7 @@ export default function WatchPage() {
   const playerBoxRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<{ cue: FeedWord; at: number }[]>([]);
   const lastOverlayIdsRef = useRef("");
+  const lastTimeRef = useRef(-1);
   const stateRef = useRef<{
     sourceId: string | null;
     segments: LocalSegment[];
@@ -142,6 +143,19 @@ export default function WatchPage() {
     if (!player) return;
     const st = stateRef.current;
     const t = player.getCurrentTime();
+
+    // Detect a seek (jump forward or back) between 500 ms ticks and re-sync:
+    // clear the overlay so no word stays frozen, drop the "already shown" memory
+    // so words at/after the new position can appear again, and force the next
+    // segment to re-trigger analysis. The freshness window below prevents a dump.
+    const prevTime = lastTimeRef.current;
+    lastTimeRef.current = t;
+    if (prevTime >= 0 && Math.abs(t - prevTime) > 2) {
+      overlayRef.current = [];
+      st.shownKeys = new Set();
+      st.lastSegment = -1;
+    }
+
     const segmentIndex = findSegmentIndexForTime(st.segments, t);
 
     if (segmentIndex !== -1 && segmentIndex !== st.lastSegment) {
@@ -157,27 +171,27 @@ export default function WatchPage() {
       }
     }
 
-    if (segmentIndex === -1) return;
-    const analyzed = st.analyzed.get(segmentIndex);
-    if (!analyzed) return;
-
-    const FRESHNESS_SECONDS = 5;
-    for (const cue of analyzed.keywordCues) {
-      const key = `${segmentIndex}:${cue.lemma}:${cue.startSeconds}`;
-      if (st.shownKeys.has(key)) continue;
-      if (t >= cue.startSeconds) {
-        st.shownKeys.add(key);
-        if (t - cue.startSeconds <= FRESHNESS_SECONDS) {
-          const id = `${key}:${Date.now()}`;
-          const fw = { ...cue, id };
-          setFeed((prev) => [fw, ...prev].slice(0, 60));
-          overlayRef.current.push({ cue: fw, at: cue.startSeconds });
+    const analyzed = segmentIndex !== -1 ? st.analyzed.get(segmentIndex) : undefined;
+    if (analyzed) {
+      const FRESHNESS_SECONDS = 5;
+      for (const cue of analyzed.keywordCues) {
+        const key = `${segmentIndex}:${cue.lemma}:${cue.startSeconds}`;
+        if (st.shownKeys.has(key)) continue;
+        if (t >= cue.startSeconds) {
+          st.shownKeys.add(key);
+          if (t - cue.startSeconds <= FRESHNESS_SECONDS) {
+            const id = `${key}:${Date.now()}`;
+            const fw = { ...cue, id };
+            setFeed((prev) => [fw, ...prev].slice(0, 60));
+            overlayRef.current.push({ cue: fw, at: cue.startSeconds });
+          }
         }
       }
     }
 
-    // Refresh the on-video overlay: drop words older than OVERLAY_SECONDS (in
-    // video time, so they persist while paused) and keep only the last few.
+    // Always refresh the on-video overlay — even in a silent gap or an
+    // unanalyzed segment — so a word respects its lifetime (OVERLAY_SECONDS of
+    // video time, so it persists while paused) and never stays stuck.
     overlayRef.current = overlayRef.current
       .filter((o) => t - o.at <= OVERLAY_SECONDS)
       .slice(-OVERLAY_MAX);
@@ -231,6 +245,7 @@ export default function WatchPage() {
           st.lastSegment = -1;
           overlayRef.current = [];
           lastOverlayIdsRef.current = "";
+          lastTimeRef.current = -1;
           setOverlay([]);
           setFeed([]);
           setVideoId(id);
@@ -271,6 +286,7 @@ export default function WatchPage() {
       st.lastSegment = -1;
       overlayRef.current = [];
       lastOverlayIdsRef.current = "";
+      lastTimeRef.current = -1;
       setOverlay([]);
 
       setFeed([]);
