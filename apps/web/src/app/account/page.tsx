@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { CEFR_LEVELS, LEVEL_PROFILES, type CefrLevel, type UserProfile } from "@streamlingo/shared";
+import BillingPanel from "@/components/BillingPanel";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -68,7 +69,8 @@ export default function AccountPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 px-6 py-10">
+    <main className="min-h-screen px-6 py-10">
+      <div className="mx-auto flex max-w-md flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">Mon compte</h1>
         <p className="text-sm text-neutral-500">
@@ -159,10 +161,6 @@ export default function AccountPage() {
       </form>
 
       <div className="mt-2 flex flex-col gap-2 border-t border-neutral-100 pt-4 text-sm">
-        <Link href="/pricing" className="flex items-center justify-between text-neutral-700 hover:text-neutral-900">
-          <span>Abonnement & facturation</span>
-          <span className="text-neutral-400">→</span>
-        </Link>
         <Link
           href="/connect-extension"
           className="flex items-center justify-between text-neutral-700 hover:text-neutral-900"
@@ -171,6 +169,13 @@ export default function AccountPage() {
           <span className="text-neutral-400">→</span>
         </Link>
       </div>
+      </div>
+
+      <section className="mx-auto mt-10 max-w-3xl border-t border-neutral-100 pt-10">
+        <Suspense fallback={<div />}>
+          <BillingPanel />
+        </Suspense>
+      </section>
     </main>
   );
 }
