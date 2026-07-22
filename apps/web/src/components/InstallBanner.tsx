@@ -12,19 +12,19 @@ const STEPS: Record<Platform, Step[]> = {
     { text: "Ouvre le menu ••• de Safari, puis appuie sur « Partager ».", img: "/install/step1.webp" },
     { text: "Fais défiler et choisis « Sur l’écran d’accueil ».", img: "/install/step2.webp" },
     { text: "Appuie sur « Ajouter » en haut à droite.", img: "/install/step3.webp" },
-    { text: "Ouvre StreamLingo depuis la nouvelle icône — plein écran, sans barre." },
+    { text: "Ouvre Wordhook depuis la nouvelle icône — plein écran, sans barre." },
   ],
   android: [
     { text: "Ouvre le menu (⋮) en haut à droite de Chrome." },
     { text: "Choisis « Ajouter à l’écran d’accueil » (ou « Installer l’application »)." },
     { text: "Confirme avec « Ajouter » / « Installer »." },
-    { text: "Ouvre StreamLingo depuis la nouvelle icône — plein écran, sans barre." },
+    { text: "Ouvre Wordhook depuis la nouvelle icône — plein écran, sans barre." },
   ],
   other: [
     { text: "Ouvre le menu de ton navigateur." },
     { text: "Cherche « Ajouter à l’écran d’accueil » ou « Installer l’application »." },
     { text: "Confirme." },
-    { text: "Ouvre StreamLingo depuis la nouvelle icône." },
+    { text: "Ouvre Wordhook depuis la nouvelle icône." },
   ],
 };
 
@@ -99,7 +99,7 @@ export default function InstallBanner() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Installer StreamLingo</h2>
+              <h2 className="text-lg font-semibold">Installer Wordhook</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -111,7 +111,7 @@ export default function InstallBanner() {
             </div>
 
             <p className="mb-4 text-sm text-neutral-500">
-              Ajoute StreamLingo à ton écran d’accueil pour l’ouvrir en plein écran, sans barre de
+              Ajoute Wordhook à ton écran d’accueil pour l’ouvrir en plein écran, sans barre de
               navigateur.
             </p>
 

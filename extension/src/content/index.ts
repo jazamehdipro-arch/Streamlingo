@@ -47,7 +47,7 @@ function ensureOverlay(position: OverlayPosition): Overlay {
 }
 
 function log(...args: unknown[]): void {
-  console.warn("[StreamLingo]", ...args);
+  console.warn("[Wordhook]", ...args);
 }
 
 async function loadProfile(): Promise<UserProfile | null> {
@@ -79,7 +79,7 @@ async function postSegment(currentSession: VideoSession, index: number): Promise
     log(`segment ${index} analysé : ${keywordCues.length} mot(s)-clé(s)`);
     if (index === 0 && keywordCues.length === 0) {
       overlay?.showNotice(
-        "StreamLingo : passage analysé mais aucun mot-clé au-dessus de ton niveau dans ce passage."
+        "Wordhook : passage analysé mais aucun mot-clé au-dessus de ton niveau dans ce passage."
       );
     }
   } catch (err) {
@@ -90,17 +90,17 @@ async function postSegment(currentSession: VideoSession, index: number): Promise
     const status = err instanceof api.ApiError ? err.status : undefined;
     if (status === 401) {
       overlay?.showNotice(
-        "StreamLingo : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options).",
+        "Wordhook : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options).",
         12000
       );
     } else if (status === 402) {
       overlay?.showNotice(
-        "StreamLingo : quota gratuit du mois atteint 🎯 — passe en Pro sur le site pour l'illimité (les vidéos déjà analysées restent dispo).",
+        "Wordhook : quota gratuit du mois atteint 🎯 — passe en Pro sur le site pour l'illimité (les vidéos déjà analysées restent dispo).",
         15000
       );
     } else if (index === 0) {
       overlay?.showNotice(
-        `StreamLingo : le serveur n'a pas répondu (${status ?? "réseau"}) — nouvel essai automatique pendant la lecture.`,
+        `Wordhook : le serveur n'a pas répondu (${status ?? "réseau"}) — nouvel essai automatique pendant la lecture.`,
         10000
       );
     }
@@ -268,14 +268,14 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   const activeOverlay = ensureOverlay(position);
 
   if (!status.paired) {
-    activeOverlay.showNotice("StreamLingo : connectez l'extension depuis les options pour activer l'overlay.");
+    activeOverlay.showNotice("Wordhook : connectez l'extension depuis les options pour activer l'overlay.");
     return;
   }
 
   const profile = await loadProfile();
   if (isStale()) return;
   if (!profile) {
-    activeOverlay.showNotice("StreamLingo : terminez l'inscription sur l'application web pour activer l'overlay.");
+    activeOverlay.showNotice("Wordhook : terminez l'inscription sur l'application web pour activer l'overlay.");
     return;
   }
   activeOverlay.setLanguage(profile.targetLanguage);
@@ -330,7 +330,7 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
   if (isStale()) return;
   if (!cues) {
     activeOverlay.showNotice(
-      "Pas de sous-titres accessibles pour cette vidéo (détails techniques dans la console : F12 → Console, filtre StreamLingo)."
+      "Pas de sous-titres accessibles pour cette vidéo (détails techniques dans la console : F12 → Console, filtre Wordhook)."
     );
     return;
   }
@@ -354,15 +354,15 @@ async function setUpVideo(videoId: string, myGeneration: number): Promise<void> 
     const status = err instanceof api.ApiError ? err.status : undefined;
     activeOverlay.showNotice(
       status === 401
-        ? "StreamLingo : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options)."
-        : `StreamLingo : impossible de joindre le serveur (${status ?? "réseau"}). Recharge la page pour réessayer.`,
+        ? "Wordhook : session expirée — génère un nouveau code sur le site et ré-associe l'extension (Options)."
+        : `Wordhook : impossible de joindre le serveur (${status ?? "réseau"}). Recharge la page pour réessayer.`,
       12000
     );
     return;
   }
   if (isStale()) return;
   log(`session démarrée : ${localSegments.length} segment(s), analyse IA du premier passage…`);
-  activeOverlay.showNotice("StreamLingo actif ✓ — analyse du premier passage en cours…");
+  activeOverlay.showNotice("Wordhook actif ✓ — analyse du premier passage en cours…");
 
   const newSession = new VideoSession(videoId, profile);
   newSession.source = source;

@@ -121,7 +121,7 @@ export default function BillingPanel() {
 
         <div className="rounded-2xl border border-neutral-200 p-5">
           <div className="flex items-center justify-between">
-            <span className="font-semibold">StreamLingo Pro</span>
+            <span className="font-semibold">Wordhook Pro</span>
             <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
               Actif
             </span>

@@ -66,7 +66,7 @@ export default function HomePage() {
           Apprends une langue avec les vidéos que tu regardes déjà
         </h1>
         <p className="max-w-xl text-lg text-neutral-500">
-          StreamLingo traduit les mots importants pendant que tu regardes YouTube ou écoutes un
+          Wordhook traduit les mots importants pendant que tu regardes YouTube ou écoutes un
           podcast — sans jamais casser l’immersion. L’apprentissage est proposé, jamais imposé.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -99,7 +99,7 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-neutral-200 py-8 text-center text-xs text-neutral-400">
-        StreamLingo — extension navigateur pour YouTube + web app pour podcasts. Ton niveau (A1–C1)
+        Wordhook — extension navigateur pour YouTube + web app pour podcasts. Ton niveau (A1–C1)
         pilote tout : quantité de mots traduits et difficulté des quiz.
       </footer>
     </main>

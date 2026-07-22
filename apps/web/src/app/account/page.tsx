@@ -358,7 +358,7 @@ export default function AccountPage() {
             Contact
           </a>
         </div>
-        <p className="mt-2">StreamLingo</p>
+        <p className="mt-2">Wordhook</p>
       </footer>
     </main>
   );

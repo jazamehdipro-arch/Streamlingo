@@ -65,7 +65,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div>
-        <h1 className="text-xl font-semibold">StreamLingo</h1>
+        <h1 className="text-xl font-semibold">Wordhook</h1>
         <p className="text-sm text-neutral-500">
           {mode === "forgot" ? "Réinitialise ton mot de passe." : "Connecte-toi pour continuer."}
         </p>

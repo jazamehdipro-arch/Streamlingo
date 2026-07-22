@@ -280,7 +280,7 @@ export default function WatchPage() {
       if (!capRes.ok) {
         const hint =
           capBody.reason === "gated"
-            ? " Astuce : regarde cette vidéo une fois sur ordinateur avec l'extension StreamLingo — elle deviendra ensuite disponible ici, mots et timings inclus."
+            ? " Astuce : regarde cette vidéo une fois sur ordinateur avec l'extension Wordhook — elle deviendra ensuite disponible ici, mots et timings inclus."
             : "";
         throw new Error((capBody.error ?? `Sous-titres indisponibles (${capRes.status})`) + hint);
       }

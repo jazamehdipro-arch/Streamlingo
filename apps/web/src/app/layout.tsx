@@ -5,11 +5,11 @@ import InstallBanner from "@/components/InstallBanner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StreamLingo — apprends une langue avec de vraies vidéos",
+  title: "Wordhook — apprends une langue avec de vraies vidéos",
   description:
     "Transforme n'importe quelle vidéo YouTube ou podcast en session d'apprentissage de langue, sans casser l'immersion.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "StreamLingo", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Wordhook", statusBarStyle: "black-translucent" },
   icons: { apple: "/icons/icon-180.png" },
 };
 

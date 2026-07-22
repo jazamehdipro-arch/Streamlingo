@@ -14,7 +14,7 @@
  *   2. the InnerTube player API with the ANDROID client, whose caption
  *      baseUrls historically skip the pot requirement;
  *   3. each candidate baseUrl tried as json3 then as legacy XML.
- * Every stage logs to the console with a [StreamLingo] prefix so a field
+ * Every stage logs to the console with a [Wordhook] prefix so a field
  * failure can be diagnosed from DevTools without a debug build.
  */
 
@@ -39,7 +39,7 @@ interface PlayerResponseCaptions {
 }
 
 function log(...args: unknown[]): void {
-  console.warn("[StreamLingo]", ...args);
+  console.warn("[Wordhook]", ...args);
 }
 
 /**

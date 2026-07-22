@@ -42,7 +42,7 @@ export default function AppNav() {
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-xs text-white">
             ▶
           </span>
-          <span className="hidden sm:inline">StreamLingo</span>
+          <span className="hidden sm:inline">Wordhook</span>
         </Link>
 
         <div className="flex shrink-0 items-center gap-1 text-xs sm:text-sm">

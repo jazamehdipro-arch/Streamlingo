@@ -342,7 +342,7 @@ export class Overlay {
     this.headerEl.className = "header";
     const brand = document.createElement("span");
     brand.className = "brand";
-    brand.innerHTML = '<span class="logo">\u25b6</span>StreamLingo';
+    brand.innerHTML = '<span class="logo">\u25b6</span>Wordhook';
     this.headerEl.appendChild(brand);
 
     this.counterBtn = document.createElement("button");

@@ -1,6 +1,6 @@
 {
-  "name": "StreamLingo",
-  "short_name": "StreamLingo",
+  "name": "Wordhook",
+  "short_name": "Wordhook",
   "description": "Apprends une langue avec les vidéos que tu regardes déjà.",
   "start_url": "/watch",
   "display": "standalone",

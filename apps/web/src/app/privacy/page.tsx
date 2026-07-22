@@ -1,4 +1,4 @@
-export const metadata = { title: "Politique de confidentialité — StreamLingo" };
+export const metadata = { title: "Politique de confidentialité — Wordhook" };
 
 export default function PrivacyPage() {
   return (
@@ -8,7 +8,7 @@ export default function PrivacyPage() {
 
       <h2>Qui sommes-nous</h2>
       <p>
-        StreamLingo est un outil d&apos;apprentissage des langues (extension navigateur et
+        Wordhook est un outil d&apos;apprentissage des langues (extension navigateur et
         application web) qui traduit les mots importants des vidéos et podcasts que vous regardez.
       </p>
 

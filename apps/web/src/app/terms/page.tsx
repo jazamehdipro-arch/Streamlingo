@@ -1,4 +1,4 @@
-export const metadata = { title: "Conditions d'utilisation — StreamLingo" };
+export const metadata = { title: "Conditions d'utilisation — Wordhook" };
 
 export default function TermsPage() {
   return (
@@ -8,9 +8,9 @@ export default function TermsPage() {
 
       <h2>Le service</h2>
       <p>
-        StreamLingo fournit des outils d&apos;apprentissage des langues à partir de contenus vidéo
+        Wordhook fournit des outils d&apos;apprentissage des langues à partir de contenus vidéo
         et audio que vous choisissez : traduction de vocabulaire, quiz, flashcards à répétition
-        espacée. StreamLingo n&apos;héberge aucun contenu vidéo : les vidéos restent lues par
+        espacée. Wordhook n&apos;héberge aucun contenu vidéo : les vidéos restent lues par
         YouTube via son lecteur officiel.
       </p>
 
