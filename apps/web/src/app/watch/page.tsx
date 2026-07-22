@@ -36,6 +36,10 @@ interface FeedWord extends KeywordCue {
 const OVERLAY_SECONDS = 7;
 const OVERLAY_MAX = 2;
 
+// Remember the current video + position so leaving and returning to the tab
+// resumes where you left off, instead of losing the video.
+const WATCH_KEY = "wordhook-watch";
+
 interface AnalyzedSegment {
   segmentId: string;
   keywordCues: KeywordCue[];
@@ -81,6 +85,9 @@ export default function WatchPage() {
   const overlayRef = useRef<{ cue: FeedWord; at: number }[]>([]);
   const lastOverlayIdsRef = useRef("");
   const lastTimeRef = useRef(-1);
+  const videoIdRef = useRef<string | null>(null);
+  const resumeAtRef = useRef(0);
+  const lastSavedTimeRef = useRef(0);
   const stateRef = useRef<{
     sourceId: string | null;
     segments: LocalSegment[];
@@ -216,6 +223,16 @@ export default function WatchPage() {
       lastOverlayIdsRef.current = ids;
       setOverlay(overlayRef.current.map((o) => o.cue));
     }
+
+    // Persist the position every few seconds so a return to the tab resumes here.
+    if (videoIdRef.current && Math.abs(t - lastSavedTimeRef.current) >= 3) {
+      lastSavedTimeRef.current = t;
+      try {
+        localStorage.setItem(WATCH_KEY, JSON.stringify({ id: videoIdRef.current, t }));
+      } catch {
+        // Storage unavailable (private mode) — resume is best-effort.
+      }
+    }
   }
 
   async function startSession(e: React.FormEvent) {
@@ -226,8 +243,23 @@ export default function WatchPage() {
       setError("Colle un lien YouTube valide (ou l'identifiant de la vidéo).");
       return;
     }
-    if (!profile) return;
+    await beginSession(id);
+  }
 
+  function rememberVideo(id: string, resumeAt: number) {
+    videoIdRef.current = id;
+    resumeAtRef.current = resumeAt;
+    lastSavedTimeRef.current = resumeAt;
+    try {
+      localStorage.setItem(WATCH_KEY, JSON.stringify({ id, t: resumeAt }));
+    } catch {
+      // Best-effort persistence.
+    }
+  }
+
+  async function beginSession(id: string, resumeAt = 0) {
+    if (!profile) return;
+    setError(null);
     setStarting(true);
     setStatus("Recherche d'une session existante…");
     try {
@@ -262,6 +294,7 @@ export default function WatchPage() {
           overlayRef.current = [];
           lastOverlayIdsRef.current = "";
           lastTimeRef.current = -1;
+          rememberVideo(id, resumeAt);
           setOverlay([]);
           setFeed([]);
           setVideoId(id);
@@ -303,6 +336,7 @@ export default function WatchPage() {
       overlayRef.current = [];
       lastOverlayIdsRef.current = "";
       lastTimeRef.current = -1;
+      rememberVideo(id, resumeAt);
       setOverlay([]);
 
       setFeed([]);
@@ -331,7 +365,11 @@ export default function WatchPage() {
         videoId,
         width: "100%",
         height: "100%",
-        playerVars: { playsinline: 1, rel: 0 },
+        playerVars: {
+          playsinline: 1,
+          rel: 0,
+          start: Math.floor(resumeAtRef.current) || undefined,
+        },
         events: {
           onReady: () => {
             interval = setInterval(onTick, 500);
@@ -360,6 +398,51 @@ export default function WatchPage() {
     // onTick reads everything through refs; videoId is the real dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);
+
+  // Restore the last video (a few seconds before where you left off) when the
+  // tab is reopened, so leaving and coming back doesn't lose it.
+  useEffect(() => {
+    if (!profile || videoId) return;
+    try {
+      const raw = localStorage.getItem(WATCH_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { id?: string; t?: number };
+      if (saved?.id) void beginSession(saved.id, Math.max(0, (saved.t ?? 0) - 2));
+    } catch {
+      // Ignore malformed/absent saved state.
+    }
+    // Restore once, as soon as the profile is available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+
+  function clearVideo() {
+    videoIdRef.current = null;
+    resumeAtRef.current = 0;
+    lastSavedTimeRef.current = 0;
+    try {
+      localStorage.removeItem(WATCH_KEY);
+    } catch {
+      // ignore
+    }
+    const st = stateRef.current;
+    st.sourceId = null;
+    st.segments = [];
+    st.analyzed = new Map();
+    st.posting = new Set();
+    st.shownKeys = new Set();
+    st.lastSegment = -1;
+    overlayRef.current = [];
+    lastOverlayIdsRef.current = "";
+    lastTimeRef.current = -1;
+    setOverlay([]);
+    setFeed([]);
+    setQuizOffer(null);
+    setStatus(null);
+    setError(null);
+    setUrlInput("");
+    setCinema(false);
+    setVideoId(null); // triggers the player effect cleanup (destroys the iframe)
+  }
 
   async function openQuiz(segmentId: string) {
     setQuizOffer(null);
@@ -507,6 +590,16 @@ export default function WatchPage() {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={clearVideo}
+              className="rounded-full border border-neutral-200 px-3 py-1.5 text-xs text-neutral-500 transition hover:border-neutral-900 hover:text-neutral-900"
+            >
+              ↺ Changer de vidéo
+            </button>
           </div>
 
           {status && <p className="text-sm text-neutral-500">{status}</p>}
