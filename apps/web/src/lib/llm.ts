@@ -193,6 +193,13 @@ words. Rules:
 - One entry per lemma: if a word recurs, include only its first occurrence.
 - Skip proper nouns (people, places, brands) and pure function words (articles, basic
   prepositions, pronouns) — they teach nothing translatable.
+- Skip transparent cognates: words nearly identical in BOTH spelling and meaning to
+  ${nativeLang} (for a French learner of English: toxic→toxique, information, important,
+  situation, animal, réaliser sense of "realize"…). The learner understands these already,
+  so surfacing them is noise.
+- BUT keep "false friends": words that look like ${nativeLang} but mean something different
+  (e.g. for French: library≠librairie, actually≠actuellement, eventually≠éventuellement) —
+  these are valuable traps worth learning.
 - Prefer words and short idiomatic phrases a learner would actually want to save to a
   vocabulary deck.
 
