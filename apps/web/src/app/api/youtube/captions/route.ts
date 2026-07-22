@@ -5,7 +5,7 @@ import { getUserId } from "@/lib/auth";
 import { badRequest, unauthorized } from "@/lib/http";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * Server-side YouTube caption fetch for the no-extension watch mode
@@ -82,20 +82,16 @@ const CLIENTS = [
  * (e.g. http://user:pass@proxy-host:port) in Vercel env and all fetches
  * below route through it; unset, they go direct.
  */
-let cachedDispatcher: { dispatcher: unknown } | undefined | null = null;
-function proxyDispatcher(): object | undefined {
-  if (cachedDispatcher !== null) return cachedDispatcher ?? undefined;
+function makeDispatcher(): object | undefined {
   const proxyUrl = process.env.CAPTIONS_PROXY_URL;
-  if (!proxyUrl) {
-    cachedDispatcher = undefined;
-    return undefined;
-  }
+  if (!proxyUrl) return undefined;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ProxyAgent } = require("undici") as typeof import("undici");
-  // Build the agent once per warm instance — one connection pool, reused across
-  // the several InnerTube client attempts and the timedtext fetch per request.
-  cachedDispatcher = { dispatcher: new ProxyAgent(proxyUrl) };
-  return cachedDispatcher;
+  // A FRESH agent every call, so the rotating residential proxy hands us a new
+  // exit IP each time. Reusing one agent kept a keep-alive tunnel pinned to a
+  // single IP — once YouTube blocked that IP, every video failed until the
+  // serverless instance recycled.
+  return { dispatcher: new ProxyAgent(proxyUrl) };
 }
 
 async function fetchPlayerResponse(
@@ -112,7 +108,7 @@ async function fetchPlayerResponse(
         "user-agent": client.userAgent,
       },
       body: JSON.stringify({ context, videoId }),
-      ...proxyDispatcher(),
+      ...makeDispatcher(),
     });
     if (!response.ok) return { tracks: [], status: `http_${response.status}` };
     const data = (await response.json()) as PlayerResponse;
@@ -143,16 +139,19 @@ function parseJson3(body: string): TranscriptCue[] {
   return cues;
 }
 
-export async function POST(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return unauthorized();
+interface CaptionResult {
+  cues: TranscriptCue[];
+  languageCode: string;
+  kind: string;
+  client: string;
+}
 
-  const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return badRequest(parsed.error.message);
-  const { videoId, language } = parsed.data;
-
-  const statuses: Record<string, string> = {};
-
+/** One full pass over the InnerTube clients. Returns captions or null. */
+async function attemptCaptions(
+  videoId: string,
+  language: string,
+  statuses: Record<string, string>
+): Promise<CaptionResult | null> {
   for (const client of CLIENTS) {
     const { tracks, status } = await fetchPlayerResponse(videoId, client);
     statuses[client.label] = status;
@@ -168,7 +167,7 @@ export async function POST(req: NextRequest) {
       url.searchParams.set("fmt", "json3");
       const response = await fetch(url.toString(), {
         headers: { "user-agent": client.userAgent },
-        ...proxyDispatcher(),
+        ...makeDispatcher(),
       });
       const body = await response.text();
       if (!response.ok || body.length === 0) {
@@ -180,15 +179,31 @@ export async function POST(req: NextRequest) {
         statuses[client.label] += " timedtext:empty";
         continue;
       }
-      return NextResponse.json({
-        cues,
-        languageCode: track.languageCode,
-        kind: track.kind ?? "manual",
-        client: client.label,
-      });
+      return { cues, languageCode: track.languageCode, kind: track.kind ?? "manual", client: client.label };
     } catch (err) {
       statuses[client.label] += ` timedtext-error:${err instanceof Error ? err.message : String(err)}`;
     }
+  }
+  return null;
+}
+
+export async function POST(req: NextRequest) {
+  const userId = await getUserId(req);
+  if (!userId) return unauthorized();
+
+  const parsed = bodySchema.safeParse(await req.json());
+  if (!parsed.success) return badRequest(parsed.error.message);
+  const { videoId, language } = parsed.data;
+
+  // Residential proxies are probabilistic: a video that fails on one exit IP
+  // usually succeeds on the next. Retry the whole sequence a few times (each
+  // round gets fresh IPs) when a proxy is configured.
+  const rounds = process.env.CAPTIONS_PROXY_URL ? 3 : 1;
+  const statuses: Record<string, string> = {};
+
+  for (let round = 0; round < rounds; round++) {
+    const result = await attemptCaptions(videoId, language, statuses);
+    if (result) return NextResponse.json(result);
   }
 
   const anyBotWall = Object.values(statuses).some((s) => /LOGIN_REQUIRED|UNPLAYABLE|http_4/.test(s));
